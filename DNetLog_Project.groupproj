@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{13B8F7C8-4C02-4CB6-BAAF-C47B92DF6395}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="LogServerWin\LogServerWin.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="TestLogClient\TestLogClient.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="LogServerWin">
+        <MSBuild Projects="LogServerWin\LogServerWin.dproj"/>
+    </Target>
+    <Target Name="LogServerWin:Clean">
+        <MSBuild Projects="LogServerWin\LogServerWin.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="LogServerWin:Make">
+        <MSBuild Projects="LogServerWin\LogServerWin.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="TestLogClient">
+        <MSBuild Projects="TestLogClient\TestLogClient.dproj"/>
+    </Target>
+    <Target Name="TestLogClient:Clean">
+        <MSBuild Projects="TestLogClient\TestLogClient.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="TestLogClient:Make">
+        <MSBuild Projects="TestLogClient\TestLogClient.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="LogServerWin;TestLogClient"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="LogServerWin:Clean;TestLogClient:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="LogServerWin:Make;TestLogClient:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

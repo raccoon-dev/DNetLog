@@ -1,0 +1,39 @@
+object frmMain: TfrmMain
+  Left = 0
+  Top = 0
+  Caption = 'Test DNetLog Client'
+  ClientHeight = 480
+  ClientWidth = 640
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  DesignerMasterStyle = 0
+  object layMain: TFlowLayout
+    Align = Client
+    Margins.Left = 5.000000000000000000
+    Margins.Top = 5.000000000000000000
+    Margins.Right = 5.000000000000000000
+    Margins.Bottom = 5.000000000000000000
+    Size.Width = 630.000000000000000000
+    Size.Height = 470.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    Justify = Left
+    JustifyLastLine = Left
+    FlowDirection = LeftToRight
+    object btnTest: TButton
+      Size.Width = 129.000000000000000000
+      Size.Height = 41.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'Test'
+      OnClick = btnTestClick
+    end
+  end
+  object tmrTest: TTimer
+    Enabled = False
+    OnTimer = tmrTestTimer
+    Left = 269
+    Top = 157
+  end
+end
