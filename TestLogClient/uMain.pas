@@ -97,13 +97,13 @@ begin
   while not Terminated do
   begin
     if (Ctr mod 4) = 1 then
-      _Log.LogDebug(0, 'Debug ' + IntToStr(Ctr), Data) else
+      _Log.d(0, 'Debug ' + IntToStr(Ctr), Data) else
     if (Ctr mod 4) = 2 then
-      _Log.LogInfo(0, 'Info ' + IntToStr(Ctr), Data) else
+      _Log.i(0, 'Info ' + IntToStr(Ctr), Data) else
     if (Ctr mod 4) = 3 then
-      _Log.LogWarning(0, 'Warning ' + IntToStr(Ctr), Data) else
+      _Log.w(0, 'Warning ' + IntToStr(Ctr), Data) else
     if (Ctr mod 4) = 0 then
-      _Log.LogError(0, 'Error ' + IntToStr(Ctr), Data);
+      _Log.e(0, 'Error ' + IntToStr(Ctr), Data);
     Inc(Ctr);
 
     Sleep(2);

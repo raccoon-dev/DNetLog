@@ -112,6 +112,7 @@ begin
     try
       FOnLogReceived(Self, ABinding.PeerIP, DecodeLogMsg(AData));
     except
+      // null
     end;
 end;
 

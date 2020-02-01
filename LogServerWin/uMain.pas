@@ -1,4 +1,4 @@
-unit uMain;
+﻿unit uMain;
 
 interface
 
@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees, Vcl.ExtCtrls,
   System.ImageList, Vcl.ImgList, DNLog.Types, DNLog.Server, System.UITypes,
   Vcl.StdCtrls, Vcl.Menus, Vcl.Buttons, System.Actions, Vcl.ActnList, Vcl.Clipbrd,
-  Vcl.ExtDlgs, System.IOUtils;
+  Vcl.ExtDlgs, System.IOUtils, Vcl.ComCtrls;
 
 type
   PLogNode = ^TLogNode;
@@ -50,6 +50,7 @@ type
     tmrFilter: TTimer;
     btnFiltersClear: TSpeedButton;
     cbTypeNr: TComboBox;
+    sbMain: TStatusBar;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -66,6 +67,7 @@ type
     procedure cbPriorityCloseUp(Sender: TObject);
     procedure edtTypeNrChange(Sender: TObject);
     procedure btnFiltersClearClick(Sender: TObject);
+    procedure vListAddToSelection(Sender: TBaseVirtualTree; Node: PVirtualNode);
   private
     { Private declarations }
     FServer: TDNLogServer;
@@ -101,6 +103,9 @@ const
   IMG_ERROR   = 3;
 
   FILE_CSV = 1;
+
+  SBAR_SEL_COUNT = 0;
+  SBAR_SEL_TIME = 1;
 
 {$R *.dfm}
 
@@ -320,6 +325,35 @@ begin
   tmrFilter.Enabled := False;
 
   FilterLog(cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text);
+end;
+
+procedure TfrmMain.vListAddToSelection(Sender: TBaseVirtualTree;
+  Node: PVirtualNode);
+var
+  n: PVirtualNode;
+  d: PLogNode;
+  min, max: Cardinal;
+begin
+  if Sender.SelectedCount > 1 then
+  begin
+    sbMain.Panels[SBAR_SEL_COUNT].Text := Format('Selected %d rows', [Sender.SelectedCount]);
+    min := Cardinal.MaxValue;
+    max := Cardinal.MinValue;
+    for n in Sender.SelectedNodes do
+    begin
+      d := Sender.GetNodeData(n);
+      if Assigned(d) then
+        if d.LogTimestamp < min then
+          min := d.LogTimestamp else
+        if d.LogTimestamp > max then
+          max := d.LogTimestamp;
+      sbMain.Panels[SBAR_SEL_TIME].Text := Format('∆ time = %d [ms]', [max - min]);
+    end;
+  end else
+  begin
+    sbMain.Panels[SBAR_SEL_COUNT].Text := string.Empty;
+    sbMain.Panels[SBAR_SEL_TIME].Text := string.Empty;
+  end;
 end;
 
 procedure TfrmMain.vListFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);

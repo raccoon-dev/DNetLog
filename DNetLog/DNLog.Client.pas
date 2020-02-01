@@ -6,12 +6,23 @@ uses
   DNLog.Types, IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal,
   System.SysUtils, System.classes;
 
+
+// Tip: You can comment that part and add "LOGS" to your's project conditional defines.
+{$UNDEF LOGS}
+{$IF Defined(DEBUG)}
+  {$DEFINE LOGS}
+{$ENDIF}
+
+
+// Comment that, if you want create and free log client by yourself.
 {$DEFINE LOG_CLIENT_AUTO_CREATE}
+
 
 type TDNLogClient = class(TObject)
   private
-    FConnected: Boolean;
+{$IF Defined(LOGS)}
     FClient: TIdUDPClient;
+{$ENDIF}
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
   protected
@@ -21,19 +32,24 @@ type TDNLogClient = class(TObject)
     destructor  Destroy; override;
     property Active: Boolean read GetActive write SetActive;
     class function Get: TDNLogClient;
-    procedure LogDebug(LogMessage: string); overload;
-    procedure LogDebug(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure LogDebug(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
-    procedure LogInfo(LogMessage: string); overload;
-    procedure LogInfo(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure LogInfo(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
-    procedure LogWarning(LogMessage: string); overload;
-    procedure LogWarning(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure LogWarning(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
-    procedure LogError(LogMessage: string); overload;
-    procedure LogError(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure LogError(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    // Debug
+    procedure d(LogMessage: string); overload;
+    procedure d(LogTypeNr: ShortInt; LogMessage: string); overload;
+    procedure d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    // Information
+    procedure i(LogMessage: string); overload;
+    procedure i(LogTypeNr: ShortInt; LogMessage: string); overload;
+    procedure i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    // Warning
+    procedure w(LogMessage: string); overload;
+    procedure w(LogTypeNr: ShortInt; LogMessage: string); overload;
+    procedure w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    // Error
+    procedure e(LogMessage: string); overload;
+    procedure e(LogTypeNr: ShortInt; LogMessage: string); overload;
+    procedure e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
 end;
+
 
 // Short version of TDNLogClient.Get
 function _Log: TDNLogClient;
@@ -54,104 +70,146 @@ var
 
 constructor TDNLogClient.Create(AUseIPv6: Boolean);
 begin
+{$IF Defined(LOGS)}
   FClient := TIdUDPClient.Create(nil);
   FClient.Host := SERVER_ADDRESS;
   FClient.Port := SERVER_BIND_PORT;
   try
     FClient.Connect;
-    FConnected := True;
   except
-    FConnected := False;
+    // null
   end;
+{$ENDIF}
 end;
 
 destructor TDNLogClient.Destroy;
 begin
+{$IF Defined(LOGS)}
   FClient.Disconnect;
   FClient.Free;
   inherited;
+{$ENDIF}
 end;
 
 class function TDNLogClient.Get: TDNLogClient;
 begin
+  if not Assigned(FLogClient) then
+  begin
+    FLogClient := Self.Create;
+    FLogClient.Active := True;
+  end;
   Result := FLogClient;
 end;
 
 function TDNLogClient.GetActive: Boolean;
 begin
-  Result := FConnected and FClient.Active;
+{$IF Defined(LOGS)}
+  Result := FClient.Active;
+{$ELSE}
+  Result := False;
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogDebug(LogMessage: string);
+procedure TDNLogClient.d(LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prDebug, 0, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogDebug(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.d(LogTypeNr: ShortInt; LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prDebug, LogTypeNr, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogDebug(LogTypeNr: ShortInt; LogMessage: string;
+procedure TDNLogClient.d(LogTypeNr: ShortInt; LogMessage: string;
   LogData: TBytes);
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prDebug, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogError(LogTypeNr: ShortInt; LogMessage: string;
+procedure TDNLogClient.e(LogTypeNr: ShortInt; LogMessage: string;
   LogData: TBytes);
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogError(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.e(LogTypeNr: ShortInt; LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogError(LogMessage: string);
+procedure TDNLogClient.e(LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prError, 0, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogInfo(LogMessage: string);
+procedure TDNLogClient.i(LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prInfo, 0, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogInfo(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.i(LogTypeNr: ShortInt; LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prInfo, LogTypeNr, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogInfo(LogTypeNr: ShortInt; LogMessage: string;
+procedure TDNLogClient.i(LogTypeNr: ShortInt; LogMessage: string;
   LogData: TBytes);
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prInfo, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
 end;
 
 procedure TDNLogClient.LogRaw(Priority: TDNLogPriority; LogTypeNr: ShortInt;
   LogMessage: string; LogData: TBytes);
+{$IF Defined(LOGS)}
 var
   Buffer: TIdBytes;
   dt: Cardinal;
   arrLogMessage: TBytes;
+{$ENDIF}
 begin
-  if not FConnected then
-    Exit;
-
+{$IF Defined(LOGS)}
   dt := TThread.GetTickCount;
   arrLogMessage := TEncoding.UTF8.GetBytes(LogMessage);
   SetLength(Buffer,
@@ -180,32 +238,45 @@ begin
   System.Move(LogData[0], Buffer[10 + Length(arrLogMessage)], Length(LogData));
 
   FClient.SendBuffer(Buffer);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogWarning(LogTypeNr: ShortInt; LogMessage: string;
+procedure TDNLogClient.w(LogTypeNr: ShortInt; LogMessage: string;
   LogData: TBytes);
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogWarning(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.w(LogTypeNr: ShortInt; LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, Data);
+{$ENDIF}
 end;
 
-procedure TDNLogClient.LogWarning(LogMessage: string);
+procedure TDNLogClient.w(LogMessage: string);
+{$IF Defined(LOGS)}
 var
   Data: TBytes;
+{$ENDIF}
 begin
+{$IF Defined(LOGS)}
   LogRaw(TDNLogPriority.prWarning, 0, LogMessage, Data);
+{$ENDIF}
 end;
 
 procedure TDNLogClient.SetActive(const Value: Boolean);
 begin
+{$IF Defined(LOGS)}
   if Value <> FClient.Active then
     FClient.Active := Value;
+{$ENDIF}
 end;
 
 {$IF Defined(LOG_CLIENT_AUTO_CREATE)}

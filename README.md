@@ -17,41 +17,41 @@ Sample log application is attached to project.
 3. Log data, using functions:
 
 ```
-_Log.LogDebug(LogMessage: string);
-_Log.LogDebug(LogTypeNr: ShortInt; LogMessage: string);
-_Log.LogDebug(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
+_Log.d(LogMessage: string);
+_Log.d(LogTypeNr: ShortInt; LogMessage: string);
+_Log.d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
-_Log.LogInfo(LogMessage: string);
-_Log.LogInfo(LogTypeNr: ShortInt; LogMessage: string);
-_Log.LogInfo(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
+_Log.i(LogMessage: string);
+_Log.i(LogTypeNr: ShortInt; LogMessage: string);
+_Log.i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
-_Log.LogWarning(LogMessage: string);
-_Log.LogWarning(LogTypeNr: ShortInt; LogMessage: string);
-_Log.LogWarning(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
+_Log.w(LogMessage: string);
+_Log.w(LogTypeNr: ShortInt; LogMessage: string);
+_Log.w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
-_Log.LogError(LogMessage: string);
-_Log.LogError(LogTypeNr: ShortInt; LogMessage: string);
-_Log.LogError(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
+_Log.e(LogMessage: string);
+_Log.e(LogTypeNr: ShortInt; LogMessage: string);
+_Log.e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
 // example:
 
-_Log.LogDebug('Some debug text');
-_Log.LogDebug(0, 'Some debug text');
-_Log.LogDebug(0, 'Some debug text', DataTBytes);
+_Log.d('Some debug text');
+_Log.d(0, 'Some debug text');
+_Log.d(0, 'Some debug text', DataTBytes);
 
-_Log.LogInfo('Some info text');
-_Log.LogInfo(0, 'Some info text');
-_Log.LogInfo(0, 'Some info text', DataTBytes);
+_Log.i('Some info text');
+_Log.i(0, 'Some info text');
+_Log.i(0, 'Some info text', DataTBytes);
 
-_Log.LogWarning('Some warning text');
-_Log.LogWarning(0, 'Some warning text');
-_Log.LogWarning(0, 'Some warning text', DataTBytes);
+_Log.w('Some warning text');
+_Log.w(0, 'Some warning text');
+_Log.w(0, 'Some warning text', DataTBytes);
 
-_Log.LogError('Some error text');
-_Log.LogError(0, 'Some error text');
-_Log.LogError(0, 'Some error text', DataTBytes);
+_Log.e('Some error text');
+_Log.e(0, 'Some error text');
+_Log.e(0, 'Some error text', DataTBytes);
 ```
 
 Number 0 from above examples, is used for group logs data only and can be any of two bytes integer numbers (ShortInt).
 
-If there is no open UDP port on selected IP address, client will try to connect with log server only once. All next logs will be ignored, so make sure log server is already started before start log client.
+Log Client requires defined "LOGS" to send logs. Without that conditional define, client will send nothing and only cost for application will be enter to procedure and leave procedure.

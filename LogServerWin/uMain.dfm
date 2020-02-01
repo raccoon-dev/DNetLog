@@ -177,7 +177,7 @@ object frmMain: TfrmMain
     Left = 0
     Top = 57
     Width = 729
-    Height = 468
+    Height = 449
     Align = alClient
     DrawSelectionMode = smBlendedRectangle
     Header.AutoSizeIndex = 3
@@ -196,9 +196,11 @@ object frmMain: TfrmMain
     TreeOptions.MiscOptions = [toAcceptOLEDrop, toFullRepaintOnResize, toGridExtensions, toInitOnSave, toToggleOnDblClick, toWheelPanning]
     TreeOptions.PaintOptions = [toShowButtons, toShowDropmark, toShowHorzGridLines, toShowTreeLines, toShowVertGridLines, toThemeAware, toUseBlendedImages, toFullVertGridLines, toUseBlendedSelection]
     TreeOptions.SelectionOptions = [toFullRowSelect, toMultiSelect, toRightClickSelect, toAlwaysSelectNode]
+    OnAddToSelection = vListAddToSelection
     OnFreeNode = vListFreeNode
     OnGetText = vListGetText
     OnGetImageIndex = vListGetImageIndex
+    ExplicitHeight = 468
     Columns = <
       item
         Alignment = taCenter
@@ -255,6 +257,22 @@ object frmMain: TfrmMain
         Text = 'Data'
         Width = 200
       end>
+  end
+  object sbMain: TStatusBar
+    Left = 0
+    Top = 506
+    Width = 729
+    Height = 19
+    Panels = <
+      item
+        Width = 150
+      end
+      item
+        Width = 200
+      end>
+    ExplicitLeft = 360
+    ExplicitTop = 416
+    ExplicitWidth = 0
   end
   object ilType: TImageList
     Height = 24
