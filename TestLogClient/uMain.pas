@@ -43,7 +43,11 @@ procedure TfrmMain.btnTestClick(Sender: TObject);
 begin
   if not _Log.Active then
   begin
-    TDialogServiceAsync.ShowMessage('Log server unavailable. Run log server and restart application.');
+{$IFDEF DEBUG}
+    TDialogServiceAsync.ShowMessage('Can''t open UDP socket for Log Client.');
+{$ELSE}
+    TDialogServiceAsync.ShowMessage('Logs are disabled in RELEASE mode.');
+{$ENDIF}
     Exit;
   end;
 

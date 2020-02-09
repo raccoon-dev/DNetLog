@@ -185,12 +185,15 @@ object frmMain: TfrmMain
     Header.MinHeight = 32
     Header.Options = [hoAutoResize, hoColumnResize, hoDblClickResize, hoDrag, hoShowSortGlyphs, hoVisible]
     Header.SortColumn = 1
+    HintMode = hmTooltip
     Images = ilType
     LineStyle = lsSolid
+    ParentShowHint = False
     PopupMenu = pmnuMain
     ScrollBarOptions.AlwaysVisible = True
     ScrollBarOptions.ScrollBars = ssVertical
     SelectionCurveRadius = 10
+    ShowHint = True
     TabOrder = 1
     TreeOptions.AutoOptions = [toAutoDropExpand, toAutoScroll, toAutoSort, toAutoTristateTracking, toAutoDeleteMovedNodes, toAutoChangeScale]
     TreeOptions.MiscOptions = [toAcceptOLEDrop, toFullRepaintOnResize, toGridExtensions, toInitOnSave, toToggleOnDblClick, toWheelPanning]
@@ -200,7 +203,8 @@ object frmMain: TfrmMain
     OnFreeNode = vListFreeNode
     OnGetText = vListGetText
     OnGetImageIndex = vListGetImageIndex
-    ExplicitHeight = 468
+    OnGetHint = vListGetHint
+    ExplicitTop = 63
     Columns = <
       item
         Alignment = taCenter
@@ -270,9 +274,6 @@ object frmMain: TfrmMain
       item
         Width = 200
       end>
-    ExplicitLeft = 360
-    ExplicitTop = 416
-    ExplicitWidth = 0
   end
   object ilType: TImageList
     Height = 24

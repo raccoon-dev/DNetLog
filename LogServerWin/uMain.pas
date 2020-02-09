@@ -68,6 +68,9 @@ type
     procedure edtTypeNrChange(Sender: TObject);
     procedure btnFiltersClearClick(Sender: TObject);
     procedure vListAddToSelection(Sender: TBaseVirtualTree; Node: PVirtualNode);
+    procedure vListGetHint(Sender: TBaseVirtualTree; Node: PVirtualNode;
+      Column: TColumnIndex; var LineBreakStyle: TVTTooltipLineBreakStyle;
+      var HintText: string);
   private
     { Private declarations }
     FServer: TDNLogServer;
@@ -371,6 +374,26 @@ begin
     d.LogData            := string.Empty;
     SetLength(d.LogDataRaw, 0);
   end;
+end;
+
+procedure TfrmMain.vListGetHint(Sender: TBaseVirtualTree; Node: PVirtualNode;
+  Column: TColumnIndex; var LineBreakStyle: TVTTooltipLineBreakStyle;
+  var HintText: string);
+var
+  d: PLogNode;
+begin
+  if Column in [COL_MESSAGE, COL_DATA] then
+  begin
+    d := Sender.GetNodeData(Node);
+    if Assigned(d) then
+      if Column = COL_MESSAGE then
+        HintText := d.LogMessage else
+      if Column = COL_DATA then
+        HintText := d.LogData
+      else
+        HintText := string.Empty;
+  end else
+    HintText := string.Empty;
 end;
 
 procedure TfrmMain.vListGetImageIndex(Sender: TBaseVirtualTree;
