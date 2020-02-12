@@ -3,6 +3,10 @@ UDP logs for Delphi
 
 ![Server screenshot](/Img/server_screenshot.png?raw=true "Server screenshot")
 
+## Compiled log server
+Compiled log server:
+[https://github.com/raccoon-dev/DNetLog/releases](https://github.com/raccoon-dev/DNetLog/releases)
+
 ## Build server application
 1. Install **VirtualTree for VCL** from GetIt Package Manager or from [https://github.com/Virtual-TreeView/Virtual-TreeView](https://github.com/Virtual-TreeView/Virtual-TreeView)
 2. Open DNetLog_Project.groupproj and build **LogServerWin** project (VCL).
