@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees, Vcl.ExtCtrls,
   System.ImageList, Vcl.ImgList, DNLog.Types, DNLog.Server, System.UITypes,
   Vcl.StdCtrls, Vcl.Menus, Vcl.Buttons, System.Actions, Vcl.ActnList, Vcl.Clipbrd,
-  Vcl.ExtDlgs, System.IOUtils, Vcl.ComCtrls;
+  Vcl.ExtDlgs, System.IOUtils, Vcl.ComCtrls, Vcl.Imaging.pngimage;
 
 type
   PLogNode = ^TLogNode;
@@ -51,6 +51,11 @@ type
     btnFiltersClear: TSpeedButton;
     cbTypeNr: TComboBox;
     sbMain: TStatusBar;
+    mCopyImgLog: TMenuItem;
+    mSaveImgLog: TMenuItem;
+    actLogImgCopy: TAction;
+    actLogImgSave: TAction;
+    dlgSaveImg: TSavePictureDialog;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -71,6 +76,8 @@ type
     procedure vListGetHint(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; var LineBreakStyle: TVTTooltipLineBreakStyle;
       var HintText: string);
+    procedure actLogImgCopyExecute(Sender: TObject);
+    procedure actLogImgSaveExecute(Sender: TObject);
   private
     { Private declarations }
     FServer: TDNLogServer;
@@ -81,6 +88,8 @@ type
     function _FilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
     function  BytesToStr(Bytes: TBytes): string;
+    function  GetLogBitmap: TBitmap;
+    function  BitmapToPng(ABitmap: TBitmap): TPNGObject;
   public
     { Public declarations }
     procedure StartFilter;
@@ -106,9 +115,14 @@ const
   IMG_ERROR   = 3;
 
   FILE_CSV = 1;
+  FILE_PNG = 1;
+  FILE_BMP = 2;
 
   SBAR_SEL_COUNT = 0;
   SBAR_SEL_TIME = 1;
+
+  SAVE_FILE_PREFIX = 'DNetLog_';
+  SAVE_FILE_DATE = 'yyyymmdd_hhnnss';
 
 {$R *.dfm}
 
@@ -151,12 +165,83 @@ begin
   end;
 end;
 
+procedure TfrmMain.actLogImgCopyExecute(Sender: TObject);
+var
+  bmp: TBitmap;
+  png: TPNGObject;
+  MyFormat : Word;
+  AData : THandle;
+  APalette : HPALETTE;
+begin
+  bmp := GetLogBitmap;
+  if Assigned(bmp) then
+    try
+      png := BitmapToPng(bmp);
+      if Assigned(png) then
+        try
+          png.SaveToClipboardFormat(MyFormat, AData, APalette);
+          ClipBoard.SetAsHandle(MyFormat, AData);
+        finally
+          png.Free;
+        end;
+    finally
+      bmp.Free;
+    end;
+end;
+
+procedure TfrmMain.actLogImgSaveExecute(Sender: TObject);
+var
+  FName: string;
+  bmp: TBitmap;
+  png: TPngObject;
+begin
+  FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
+  if dlgSaveImg.FilterIndex = FILE_PNG then
+    dlgSaveImg.FileName := FName + '.png' else
+  if dlgSaveImg.FilterIndex = FILE_BMP then
+    dlgSaveImg.FileName := FName + '.bmp';
+
+  if dlgSaveImg.Execute then
+  begin
+    FName := dlgSave.FileName;
+    bmp := GetLogBitmap;
+    if Assigned(bmp) then
+      try
+        if dlgSave.FilterIndex = FILE_PNG then
+        begin
+          if not TPath.GetExtension(FName).ToLower.Equals('.png') then
+            FName := FName + '.png';
+
+          png := BitmapToPng(bmp);
+          if Assigned(png) then
+            try
+              png.SaveToFile(FName);
+            finally
+              png.Free;
+            end;
+        end else
+        if dlgSave.FilterIndex = FILE_BMP then
+        begin
+          if not TPath.GetExtension(FName).ToLower.Equals('.bmp') then
+            FName := FName + '.bmp';
+          bmp.SaveToFile(FName);
+        end;
+      finally
+        bmp.Free;
+      end;
+  end;
+end;
+
 procedure TfrmMain.actLogSaveExecute(Sender: TObject);
 var
   FName: string;
   sb: TStringBuilder;
   sl: TStringList;
 begin
+  FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
+  if dlgSaveImg.FilterIndex = FILE_CSV then
+    dlgSaveImg.FileName := FName + '.csv' else
+
   if dlgSave.Execute then
   begin
     FName := dlgSave.FileName;
@@ -177,6 +262,16 @@ begin
       end;
     end;
   end;
+end;
+
+function TfrmMain.BitmapToPng(ABitmap: TBitmap): TPNGObject;
+begin
+  if Assigned(ABitmap) then
+  begin
+    Result := TPNGObject.Create;
+    Result.Assign(ABitmap);
+  end else
+    Result := nil;
 end;
 
 procedure TfrmMain.btnFiltersClearClick(Sender: TObject);
@@ -263,6 +358,21 @@ end;
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
   FServer.Free;
+end;
+
+function TfrmMain.GetLogBitmap: TBitmap;
+var
+  DC: HDC;
+begin
+  Result := TBitmap.Create;
+
+  DC :=GetWindowDC(vList.Handle);
+  Result.Width  :=vList.Width;
+  Result.Height :=vList.Height;
+  with Result do
+    BitBlt(Canvas.Handle, 0, 0, Width, Height, DC, 0, 0, SrcCopy);
+
+  ReleaseDC(vList.Handle, DC);
 end;
 
 procedure TfrmMain.LogRowToString(AData: PLogNode;

@@ -204,7 +204,6 @@ object frmMain: TfrmMain
     OnGetText = vListGetText
     OnGetImageIndex = vListGetImageIndex
     OnGetHint = vListGetHint
-    ExplicitTop = 63
     Columns = <
       item
         Alignment = taCenter
@@ -899,6 +898,12 @@ object frmMain: TfrmMain
     object mSaveLog: TMenuItem
       Action = actLogSave
     end
+    object mCopyImgLog: TMenuItem
+      Action = actLogImgCopy
+    end
+    object mSaveImgLog: TMenuItem
+      Action = actLogImgSave
+    end
   end
   object alMain: TActionList
     Left = 488
@@ -915,6 +920,14 @@ object frmMain: TfrmMain
       Caption = 'Save Log to File'
       OnExecute = actLogSaveExecute
     end
+    object actLogImgCopy: TAction
+      Caption = 'Copy Log Image to Clipboard'
+      OnExecute = actLogImgCopyExecute
+    end
+    object actLogImgSave: TAction
+      Caption = 'Save Log Image to File'
+      OnExecute = actLogImgSaveExecute
+    end
   end
   object dlgSave: TSaveTextFileDialog
     Filter = 'CSV Files (*.csv)|*.csv'
@@ -928,5 +941,12 @@ object frmMain: TfrmMain
     OnTimer = tmrFilterTimer
     Left = 400
     Top = 160
+  end
+  object dlgSaveImg: TSavePictureDialog
+    Filter = 'Portable Network Graphics (*.png)|*.png|Bitmaps (*.bmp)|*.bmp'
+    Options = [ofOverwritePrompt, ofHideReadOnly, ofPathMustExist, ofEnableSizing]
+    Title = 'Save Log Image As...'
+    Left = 288
+    Top = 264
   end
 end
