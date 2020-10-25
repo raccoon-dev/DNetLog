@@ -4,7 +4,7 @@ interface
 
 uses
   DNLog.Types, IdGlobal, IdBaseComponent, IdComponent, IdUDPBase, IdUDPServer,
-  IdSocketHandle, System.SysUtils;
+  IdSocketHandle, System.SysUtils, IdTCPServer, System.Classes, IdContext;
 
 {$DEFINE LOG_SERVER_AUTO_ON}
 
@@ -12,13 +12,17 @@ type TOnLogReceived = procedure(Sender: TObject; const ClientIP: string; const L
 
 type TDNLogServer = class(TObject)
   private
-    FServer: TIdUDPServer;
+    FBuffer: TIdBytes;
+    FServerUDP: TIdUDPServer;
+    FServerTCP: TIdTCPServer;
     FOnLogReceived: TOnLogReceived;
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
+    procedure TrimLeft(var AData: TBytes; ALength: Integer);
   protected
     procedure _OnUDPRead(AThread: TIdUDPListenerThread; const AData: TIdBytes; ABinding: TIdSocketHandle);
-    function DecodeLogMsg(ABytes: TIdBytes): TDNLogMessage;
+    procedure _OnExecute(AContext: TIdContext);
+    function DecodeLogMsg(var ABytes: TIdBytes; var AMessage: TDNLogMessage): Boolean;
   public
     constructor Create;
     destructor  Destroy; override;
@@ -28,92 +32,162 @@ end;
 
 implementation
 
+const
+  MB1 = 1024 * 1024;
+
 { TDNLogServer }
 
 constructor TDNLogServer.Create;
 var
   sockh: TIdSocketHandle;
 begin
-  FServer := TIdUDPServer.Create(nil);
-  FServer.DefaultPort := SERVER_BIND_PORT;
-  FServer.IPVersion := TIdIPVersion.Id_IPv4;
-  FServer.BufferSize := SERVER_BUFFER_SIZE * 1024 * 1024; // [MB]
-  sockh := FServer.Bindings.Add;
+  inherited;
+
+  FServerUDP := TIdUDPServer.Create(nil);
+  FServerUDP.DefaultPort := SERVER_BIND_PORT;
+  FServerUDP.IPVersion := TIdIPVersion.Id_IPv4;
+  FServerUDP.BufferSize := SERVER_BUFFER_SIZE * MB1; // [MB]
+  sockh := FServerUDP.Bindings.Add;
   sockh.SetBinding(SERVER_BIND_ADDRESS_4, SERVER_BIND_PORT, TIdIPVersion.Id_IPv4);
-  sockh := FServer.Bindings.Add;
+  sockh := FServerUDP.Bindings.Add;
   sockh.SetBinding(SERVER_BIND_ADDRESS_6, SERVER_BIND_PORT, TIdIPVersion.Id_IPv6);
-  FServer.OnUDPRead := _OnUDPRead;
+  FServerUDP.OnUDPRead := _OnUDPRead;
+
+  FServerTCP := TIdTCPServer.Create(nil);
+  FServerTCP.DefaultPort := SERVER_BIND_PORT;
+  sockh := FServerTCP.Bindings.Add;
+  sockh.SetBinding(SERVER_BIND_ADDRESS_4, SERVER_BIND_PORT, TIdIPVersion.Id_IPv4);
+  sockh := FServerTCP.Bindings.Add;
+  sockh.SetBinding(SERVER_BIND_ADDRESS_6, SERVER_BIND_PORT, TIdIPVersion.Id_IPv6);
+  FServerTCP.OnExecute := _OnExecute;
+
 {$IF Defined(LOG_SERVER_AUTO_ON)}
   Active := True;
 {$ENDIF}
 end;
 
-function TDNLogServer.DecodeLogMsg(ABytes: TIdBytes): TDNLogMessage;
+function TDNLogServer.DecodeLogMsg(var ABytes: TIdBytes; var AMessage: TDNLogMessage): boolean;
 var
   Msg: TBytes;
-  Len, RawLen: Word;
+  TextLen, DataLen: Word;
 begin
+  Result := False;
   if Length(ABytes) < 10 then
-    raise Exception.Create('Wrong message size');
+    Exit;
 
-  Result.LogPriority := TDNLogPriority(ABytes[0]);
-  Result.LogTimestamp := (ABytes[1] shl 24) +
+  AMessage.LogPriority := TDNLogPriority(ABytes[0]);
+  AMessage.LogTimestamp := (ABytes[1] shl 24) +
                          (ABytes[2] shl 16) +
                          (ABytes[3] shl 8) +
                           ABytes[4];
-  Result.LogTypeNr := ABytes[5];
+  AMessage.LogTypeNr := ABytes[5];
 
-  Len := (ABytes[6] shl 8) + ABytes[7];
-  if Len > Length(ABytes) - 10 then
-    raise Exception.Create('Wrong message data size');
-  if Len > 0 then
+  // Message text
+  TextLen := (ABytes[6] shl 8) + ABytes[7];
+  if TextLen > Length(ABytes) - 10 then
+    Exit;
+  if TextLen > 0 then
   begin
-    SetLength(Msg, Len);
-    System.Move(ABytes[8], Msg[0], Len);
-    Result.LogMessage := TEncoding.UTF8.GetString(Msg);
+    SetLength(Msg, TextLen);
+    System.Move(ABytes[8], Msg[0], TextLen);
+    AMessage.LogMessage := TEncoding.UTF8.GetString(Msg);
   end else
-    Result.LogMessage := string.Empty; // Not necessary
+    AMessage.LogMessage := string.Empty; // Not really necessary
   SetLength(Msg, 0);
 
-  RawLen := (ABytes[8 + Len] shl 8) + ABytes[9 + Len];
-  if RawLen > Length(ABytes) - 10 then
-    raise Exception.Create('Wrong message data size');
-  if RawLen > 0 then
+  // Message data
+  DataLen := (ABytes[8 + TextLen] shl 8) + ABytes[9 + TextLen];
+  if DataLen > Length(ABytes) - 10 then
+    Exit;
+  if DataLen > 0 then
   begin
-    SetLength(Result.LogData, RawLen);
-    System.Move(ABytes[10 + Len], Result.LogData[0], RawLen);
+    SetLength(AMessage.LogData, DataLen);
+    System.Move(ABytes[10 + TextLen], AMessage.LogData[0], DataLen);
   end else
-    SetLength(Result.LogData, 0); // Not necessary
+    SetLength(AMessage.LogData, 0); // Not really necessary
+  TrimLeft(TBytes(ABytes),
+            1 {Priority} +
+            4 {timestamp} +
+            1 {TypeNr} +
+            2 {Message Length} +
+            2 {Data Length} +
+            TextLen +
+            DataLen);
+  Result := True;
 end;
 
 destructor TDNLogServer.Destroy;
 begin
   FOnLogReceived := nil;
-  FServer.Active := False;
-  FServer.Free;
+  FServerUDP.Active := False;
+  FServerUDP.Free;
+  FServerTCP.Active := False;
+  FServerTCP.Free;
   inherited;
 end;
 
 function TDNLogServer.GetActive: Boolean;
 begin
-  Result := FServer.Active;
+  Result := FServerUDP.Active and FServerTCP.Active;
 end;
 
 procedure TDNLogServer.SetActive(const Value: Boolean);
 begin
-  if Value <> FServer.Active then
-    FServer.Active := Value;
+  if Value <> FServerUDP.Active then
+    FServerUDP.Active := Value;
+  if Value <> FServerTcp.Active then
+    FServerTCP.Active := Value;
+end;
+
+procedure TDNLogServer.TrimLeft(var AData: TBytes; ALength: Integer);
+var
+  b: TBytes;
+begin
+  SetLength(b, Length(AData) - ALength);
+  System.Move(AData[ALength], b[0], Length(b));
+  SetLength(AData, Length(b));
+  System.Move(b[0], AData[0], Length(b));
+  SetLength(b, 0);
+end;
+
+procedure TDNLogServer._OnExecute(AContext: TIdContext);
+var
+  DNLogMessage: TDNLogMessage;
+begin
+  try
+    AContext.Connection.Socket.ReadTimeout := 100;
+    AContext.Connection.Socket.ReadBytes(FBuffer, -1, True);
+    if Length(FBuffer) > 0 then
+      while DecodeLogMsg(FBuffer, DNLogMessage) do
+        if Assigned(FOnLogReceived) then
+          TThread.Synchronize(TThread.Current, procedure
+          begin
+            FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
+          end);
+  except
+    // null
+  end;
 end;
 
 procedure TDNLogServer._OnUDPRead(AThread: TIdUDPListenerThread;
   const AData: TIdBytes; ABinding: TIdSocketHandle);
 begin
   if Assigned(FOnLogReceived) then
-    try
-      FOnLogReceived(Self, ABinding.PeerIP, DecodeLogMsg(AData));
-    except
-      // null
-    end;
+    TThread.Queue(nil, procedure
+    var
+      LogMsg: TDNLogMessage;
+      b: TIdBytes;
+    begin
+      try
+        SetLength(b, Length(AData));
+        System.Move(AData[0], b[0], Length(b));
+        if DecodeLogMsg(b, LogMsg) and Assigned(FOnLogReceived) then
+          FOnLogReceived(Self, ABinding.PeerIP, LogMsg);
+        SetLength(b, 0);
+      except
+        // null
+      end;
+    end);
 end;
 
 end.

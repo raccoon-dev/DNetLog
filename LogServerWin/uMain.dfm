@@ -949,4 +949,12 @@ object frmMain: TfrmMain
     Left = 288
     Top = 264
   end
+  object IdSocksServer1: TIdSocksServer
+    Bindings = <>
+    AllowSocks4 = True
+    AllowSocks5 = True
+    NeedsAuthentication = False
+    Left = 440
+    Top = 320
+  end
 end

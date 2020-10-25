@@ -7,7 +7,8 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees, Vcl.ExtCtrls,
   System.ImageList, Vcl.ImgList, DNLog.Types, DNLog.Server, System.UITypes,
   Vcl.StdCtrls, Vcl.Menus, Vcl.Buttons, System.Actions, Vcl.ActnList, Vcl.Clipbrd,
-  Vcl.ExtDlgs, System.IOUtils, Vcl.ComCtrls, Vcl.Imaging.pngimage;
+  Vcl.ExtDlgs, System.IOUtils, Vcl.ComCtrls, Vcl.Imaging.pngimage,
+  IdBaseComponent, IdComponent, IdCustomTCPServer, IdSocksServer;
 
 type
   PLogNode = ^TLogNode;
@@ -56,6 +57,7 @@ type
     actLogImgCopy: TAction;
     actLogImgSave: TAction;
     dlgSaveImg: TSavePictureDialog;
+    IdSocksServer1: TIdSocksServer;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -89,7 +91,7 @@ type
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
     function  BytesToStr(Bytes: TBytes): string;
     function  GetLogBitmap: TBitmap;
-    function  BitmapToPng(ABitmap: TBitmap): TPNGObject;
+    function  BitmapToPng(ABitmap: TBitmap): TPNGImage;
   public
     { Public declarations }
     procedure StartFilter;
@@ -168,7 +170,7 @@ end;
 procedure TfrmMain.actLogImgCopyExecute(Sender: TObject);
 var
   bmp: TBitmap;
-  png: TPNGObject;
+  png: TPNGImage;
   MyFormat : Word;
   AData : THandle;
   APalette : HPALETTE;
@@ -193,7 +195,7 @@ procedure TfrmMain.actLogImgSaveExecute(Sender: TObject);
 var
   FName: string;
   bmp: TBitmap;
-  png: TPngObject;
+  png: TPNGImage;
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
   if dlgSaveImg.FilterIndex = FILE_PNG then
@@ -203,11 +205,11 @@ begin
 
   if dlgSaveImg.Execute then
   begin
-    FName := dlgSave.FileName;
+    FName := dlgSaveImg.FileName;
     bmp := GetLogBitmap;
     if Assigned(bmp) then
       try
-        if dlgSave.FilterIndex = FILE_PNG then
+        if dlgSaveImg.FilterIndex = FILE_PNG then
         begin
           if not TPath.GetExtension(FName).ToLower.Equals('.png') then
             FName := FName + '.png';
@@ -220,7 +222,7 @@ begin
               png.Free;
             end;
         end else
-        if dlgSave.FilterIndex = FILE_BMP then
+        if dlgSaveImg.FilterIndex = FILE_BMP then
         begin
           if not TPath.GetExtension(FName).ToLower.Equals('.bmp') then
             FName := FName + '.bmp';
@@ -239,8 +241,10 @@ var
   sl: TStringList;
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
-  if dlgSaveImg.FilterIndex = FILE_CSV then
-    dlgSaveImg.FileName := FName + '.csv' else
+  if dlgSave.FilterIndex = FILE_CSV then
+    dlgSave.FileName := FName + '.csv'
+  else
+    dlgSave.FileName := FName + '.txt'; // We don't support anythig except csv, but maybe someday...
 
   if dlgSave.Execute then
   begin
@@ -264,11 +268,11 @@ begin
   end;
 end;
 
-function TfrmMain.BitmapToPng(ABitmap: TBitmap): TPNGObject;
+function TfrmMain.BitmapToPng(ABitmap: TBitmap): TPNGImage;
 begin
   if Assigned(ABitmap) then
   begin
-    Result := TPNGObject.Create;
+    Result := TPNGImage.Create;
     Result.Assign(ABitmap);
   end else
     Result := nil;

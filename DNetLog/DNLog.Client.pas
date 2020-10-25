@@ -2,48 +2,58 @@ unit DNLog.Client;
 
 interface
 
-uses
-  DNLog.Types, IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal,
-  System.SysUtils, System.classes;
-
-
 // Tip: You can comment that part and add "LOGS" to your's project conditional defines.
 {$UNDEF LOGS}
 {$IF Defined(DEBUG)}
   {$DEFINE LOGS}
 {$ENDIF}
 
+// Comment this define to use UDP by default
+{$DEFINE BY_DEFAULT_USE_TCP}
+
+// Comment this to disable auto create log client on first use, but
+// _Log and TDNLogClient.Get functions  will return nil in that case.
+{$DEFINE AUTO_CREATE_CLIENT}
+
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+uses
+  DNLog.Types, IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal,
+  System.SysUtils, System.classes, IdTCPClient;
+{$ENDIF}
+
 
 type TDNLogClient = class(TObject)
   private
 {$IF Defined(DEBUG) AND Defined(LOGS)}
-    FClient: TIdUDPClient;
+    FUdpClient: TIdUDPClient;
+    FTcpClient: TIdTCPClient;
+    FUseTcp: Boolean;
 {$ENDIF}
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
   protected
     procedure LogRaw(Priority: TDNLogPriority; LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
   public
-    constructor Create(AUseIPv6: Boolean = False);
+    constructor Create(AUseTCP: Boolean = {$IF Defined(BY_DEFAULT_USE_TCP)}True{$ELSE}False{$ENDIF}; AUseIPv6: Boolean = False);
     destructor  Destroy; override;
     property Active: Boolean read GetActive write SetActive;
     class function Get: TDNLogClient;
     // Debug
-    procedure d(LogMessage: string); overload;
-    procedure d(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    procedure d(LogMessage: string); overload; inline;
+    procedure d(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
+    procedure d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
     // Information
-    procedure i(LogMessage: string); overload;
-    procedure i(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    procedure i(LogMessage: string); overload; inline;
+    procedure i(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
+    procedure i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
     // Warning
-    procedure w(LogMessage: string); overload;
-    procedure w(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    procedure w(LogMessage: string); overload; inline;
+    procedure w(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
+    procedure w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
     // Error
-    procedure e(LogMessage: string); overload;
-    procedure e(LogTypeNr: ShortInt; LogMessage: string); overload;
-    procedure e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload;
+    procedure e(LogMessage: string); overload; inline;
+    procedure e(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
+    procedure e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
 end;
 
 
@@ -64,36 +74,59 @@ var
 
 { TDNLogClient }
 
-constructor TDNLogClient.Create(AUseIPv6: Boolean);
+constructor TDNLogClient.Create(AUseTCP: Boolean; AUseIPv6: Boolean);
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
-  FClient := TIdUDPClient.Create(nil);
-  FClient.Host := SERVER_ADDRESS;
-  FClient.Port := SERVER_BIND_PORT;
-  FClient.Connect;
+  if AUseTcp then
+  begin
+    FUseTcp := True;
+    FTcpclient := TIdTCPClient.Create(nil);
+    FTcpClient.Host := SERVER_ADDRESS;
+    FTcpClient.Port := SERVER_BIND_PORT;
+    FTcpClient.Connect;
+  end else
+  begin
+    FUseTcp := False;
+    FUdpClient := TIdUDPClient.Create(nil);
+    FUdpClient.Host := SERVER_ADDRESS;
+    FUdpClient.Port := SERVER_BIND_PORT;
+    FUdpClient.Connect;
+  end;
 {$ENDIF}
 end;
 
 destructor TDNLogClient.Destroy;
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
-  FClient.Disconnect;
-  FClient.Free;
+  if FUseTcp then
+  begin
+    FTcpClient.Disconnect;
+    FTcpClient.Free;
+  end else
+  begin
+    FUdpClient.Disconnect;
+    FUdpClient.Free;
+  end;
 {$ENDIF}
   inherited;
 end;
 
 class function TDNLogClient.Get: TDNLogClient;
 begin
+{$IF Defined(AUTO_CREATE_CLIENT)}
   if not Assigned(FLogClient) then
     FLogClient := Self.Create;
+{$ENDIF}
   Result := FLogClient;
 end;
 
 function TDNLogClient.GetActive: Boolean;
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
-  Result := FClient.Active;
+  if FUseTcp then
+    Result := FTcpClient.Connected
+  else
+    Result := FUdpClient.Active;
 {$ELSE}
   Result := False;
 {$ENDIF}
@@ -225,8 +258,10 @@ begin
   Buffer[9 + Length(arrLogMessage)] := Byte(Length(LogData));
 
   System.Move(LogData[0], Buffer[10 + Length(arrLogMessage)], Length(LogData));
-
-  FClient.SendBuffer(Buffer);
+  if FUseTcp then
+    FTcpClient.Socket.Write(TIdBytes(Buffer), Length(Buffer))
+  else
+    FUdpClient.SendBuffer(Buffer);
 {$ENDIF}
 end;
 
@@ -263,13 +298,25 @@ end;
 procedure TDNLogClient.SetActive(const Value: Boolean);
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
-  if Value <> FClient.Active then
-    FClient.Active := Value;
+  if FUseTcp then
+  begin
+    if Value <> FTcpClient.Connected then
+      if Value then
+        FTcpClient.Connect else
+      begin
+        FTcpClient.DisconnectNotifyPeer;
+        FTcpClient.Disconnect;
+      end;
+  end else
+  begin
+    if Value <> FUdpClient.Active then
+      FUdpClient.Active := Value;
+  end;
 {$ENDIF}
 end;
 
 initialization
-// nil
+  FLogClient := nil;
 
 finalization
   if Assigned(FLogClient) then

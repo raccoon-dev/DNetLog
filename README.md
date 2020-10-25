@@ -1,5 +1,5 @@
 # DNetLog
-UDP logs for Delphi
+TCP/UDP logs for Delphi
 
 ![Server screenshot](/Img/server_screenshot.png?raw=true "Server screenshot")
 
@@ -59,3 +59,7 @@ _Log.e(0, 'Some error text', DataTBytes);
 Number 0 from above examples, is used for group logs data only and can be any of two bytes integer numbers (ShortInt).
 
 Log Client requires defined "LOGS" to send logs. Without that conditional define, client will send nothing and only cost for application will be enter to procedure and leave procedure.
+
+TCP client is set by default. You can change that to UDP by comment define BY_DEFAULT_USE_TCP on top of DNLog.Client unit.
+
+You can disable auto create log client on first use by comment define AUTO_CREATE_CLIENT on top of DNLog.Client unit.
