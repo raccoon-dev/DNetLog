@@ -34,10 +34,11 @@ type TDNLogClient = class(TObject)
   protected
     procedure LogRaw(Priority: TDNLogPriority; LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
   public
-    constructor Create(AUseTCP: Boolean = {$IF Defined(BY_DEFAULT_USE_TCP)}True{$ELSE}False{$ENDIF}; AUseIPv6: Boolean = False);
+    constructor Create(AUseTCP: Boolean; AUseIPv6: Boolean);
     destructor  Destroy; override;
     property Active: Boolean read GetActive write SetActive;
     class function Get: TDNLogClient;
+    class procedure CreateClient(AUseTCP: Boolean = {$IF Defined(BY_DEFAULT_USE_TCP)}True{$ELSE}False{$ENDIF}; AUseIPv6: Boolean = False);
     // Debug
     procedure d(LogMessage: string); overload; inline;
     procedure d(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
@@ -95,6 +96,13 @@ begin
 {$ENDIF}
 end;
 
+class procedure TDNLogClient.CreateClient(AUseTCP: Boolean = {$IF Defined(BY_DEFAULT_USE_TCP)}True{$ELSE}False{$ENDIF}; AUseIPv6: Boolean = False);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  FLogClient := Self.Create(AUseTCP, AUseIPv6);
+{$ENDIF}
+end;
+
 destructor TDNLogClient.Destroy;
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
@@ -113,11 +121,15 @@ end;
 
 class function TDNLogClient.Get: TDNLogClient;
 begin
-{$IF Defined(AUTO_CREATE_CLIENT)}
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  {$IF Defined(AUTO_CREATE_CLIENT)}
   if not Assigned(FLogClient) then
-    FLogClient := Self.Create;
-{$ENDIF}
+    CreateClient;
+  {$ENDIF}
   Result := FLogClient;
+{$ELSE}
+  Result := nil;
+{$ENDIF}
 end;
 
 function TDNLogClient.GetActive: Boolean;
