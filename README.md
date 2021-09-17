@@ -22,38 +22,56 @@ Sample log application is attached to project.
 
 ```
 _Log.d(LogMessage: string);
+_Log.d(LogMessage: string; LogData: TBytes);
 _Log.d(LogTypeNr: ShortInt; LogMessage: string);
 _Log.d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
 _Log.i(LogMessage: string);
+_Log.i(LogMessage: string; LogData: TBytes);
 _Log.i(LogTypeNr: ShortInt; LogMessage: string);
 _Log.i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
 _Log.w(LogMessage: string);
+_Log.w(LogMessage: string; LogData: TBytes);
 _Log.w(LogTypeNr: ShortInt; LogMessage: string);
 _Log.w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
 _Log.e(LogMessage: string);
+_Log.e(LogMessage: string; LogData: TBytes);
 _Log.e(LogTypeNr: ShortInt; LogMessage: string);
 _Log.e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
+
+_Log.x(LogMessage: string);
+_Log.x(LogMessage: string; LogData: TBytes);
+_Log.x(LogTypeNr: ShortInt; LogMessage: string);
+_Log.x(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 
 // example:
 
 _Log.d('Some debug text');
+_Log.d('Some debug text', DataTBytes);
 _Log.d(0, 'Some debug text');
 _Log.d(0, 'Some debug text', DataTBytes);
 
 _Log.i('Some info text');
+_Log.i('Some info text', DataTBytes);
 _Log.i(0, 'Some info text');
 _Log.i(0, 'Some info text', DataTBytes);
 
 _Log.w('Some warning text');
+_Log.w('Some warning text', DataTBytes);
 _Log.w(0, 'Some warning text');
 _Log.w(0, 'Some warning text', DataTBytes);
 
 _Log.e('Some error text');
+_Log.e('Some error text', DataTBytes);
 _Log.e(0, 'Some error text');
 _Log.e(0, 'Some error text', DataTBytes);
+
+_Log.x('Some exception text');
+_Log.x('Some exception text', DataTBytes);
+_Log.x(0, 'Some exception text');
+_Log.x(0, 'Some exception text', DataTBytes);
 ```
 
 Number 0 from above examples, is used for group logs data only and can be any of two bytes integer numbers (ShortInt).

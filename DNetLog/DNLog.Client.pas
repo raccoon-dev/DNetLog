@@ -41,20 +41,29 @@ type TDNLogClient = class(TObject)
     class procedure CreateClient(AUseTCP: Boolean = {$IF Defined(BY_DEFAULT_USE_TCP)}True{$ELSE}False{$ENDIF}; AUseIPv6: Boolean = False);
     // Debug
     procedure d(LogMessage: string); overload; inline;
+    procedure d(LogMessage: string; LogData: TBytes); overload; inline;
     procedure d(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
     procedure d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
     // Information
     procedure i(LogMessage: string); overload; inline;
+    procedure i(LogMessage: string; LogData: TBytes); overload; inline;
     procedure i(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
     procedure i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
     // Warning
     procedure w(LogMessage: string); overload; inline;
+    procedure w(LogMessage: string; LogData: TBytes); overload; inline;
     procedure w(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
     procedure w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
     // Error
     procedure e(LogMessage: string); overload; inline;
+    procedure e(LogMessage: string; LogData: TBytes); overload; inline;
     procedure e(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
     procedure e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
+    // Exception
+    procedure x(LogMessage: string); overload; inline;
+    procedure x(LogMessage: string; LogData: TBytes); overload; inline;
+    procedure x(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
+    procedure x(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
 end;
 
 
@@ -174,11 +183,25 @@ begin
 {$ENDIF}
 end;
 
+procedure TDNLogClient.d(LogMessage: string; LogData: TBytes);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prDebug, 0, LogMessage, LogData);
+{$ENDIF}
+end;
+
 procedure TDNLogClient.e(LogTypeNr: ShortInt; LogMessage: string;
   LogData: TBytes);
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
   LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.e(LogMessage: string; LogData: TBytes);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prError, 0, LogMessage, LogData);
 {$ENDIF}
 end;
 
@@ -234,6 +257,13 @@ begin
 {$ENDIF}
 end;
 
+procedure TDNLogClient.i(LogMessage: string; LogData: TBytes);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prInfo, 0, LogMessage, LogData);
+{$ENDIF}
+end;
+
 procedure TDNLogClient.LogRaw(Priority: TDNLogPriority; LogTypeNr: ShortInt;
   LogMessage: string; LogData: TBytes);
 {$IF Defined(DEBUG) AND Defined(LOGS)}
@@ -277,11 +307,48 @@ begin
 {$ENDIF}
 end;
 
+procedure TDNLogClient.x(LogMessage: string);
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+var
+  Data: TBytes;
+{$ENDIF}
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prException, 0, LogMessage, Data);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(LogTypeNr: ShortInt; LogMessage: string);
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+var
+  Data: TBytes;
+{$ENDIF}
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prException, LogTypeNr, LogMessage, Data);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(LogTypeNr: ShortInt; LogMessage: string;
+  LogData: TBytes);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prException, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
+end;
+
 procedure TDNLogClient.w(LogTypeNr: ShortInt; LogMessage: string;
   LogData: TBytes);
 begin
 {$IF Defined(DEBUG) AND Defined(LOGS)}
   LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(LogMessage: string; LogData: TBytes);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prException, 0, LogMessage, LogData);
 {$ENDIF}
 end;
 
@@ -324,6 +391,13 @@ begin
     if Value <> FUdpClient.Active then
       FUdpClient.Active := Value;
   end;
+{$ENDIF}
+end;
+
+procedure TDNLogClient.w(LogMessage: string; LogData: TBytes);
+begin
+{$IF Defined(DEBUG) AND Defined(LOGS)}
+  LogRaw(TDNLogPriority.prWarning, 0, LogMessage, LogData);
 {$ENDIF}
 end;
 

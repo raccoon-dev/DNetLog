@@ -14,7 +14,7 @@ const
   SERVER_BIND_PORT = 9999;
   SERVER_BUFFER_SIZE = 20; // [MB] // We need this, because it's UDP (more = better).
 
-type TDNLogPriority = (prDebug, prInfo, prWarning, prError);
+type TDNLogPriority = (prDebug, prInfo, prWarning, prError, prException);
 
 type TDNLogMessage = record
   LogPriority: TDNLogPriority;

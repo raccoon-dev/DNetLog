@@ -1,4 +1,4 @@
-unit uMain;
+﻿unit uMain;
 
 interface
 
@@ -93,6 +93,7 @@ var
   Ctr: Cardinal;
   Data: TBytes;
   i: Integer;
+  s: string;
 begin
   FreeOnTerminate := False;
   Ctr := 1;
@@ -103,19 +104,33 @@ begin
 
   while not Terminated do
   begin
-    if (Ctr mod 4) = 1 then
+    if (Ctr mod 5) = 1 then
       _Log.d(0, 'Debug ' + IntToStr(Ctr), Data) else
-    if (Ctr mod 4) = 2 then
+    if (Ctr mod 5) = 2 then
       _Log.i(0, 'Info ' + IntToStr(Ctr), Data) else
-    if (Ctr mod 4) = 3 then
+    if (Ctr mod 5) = 3 then
       _Log.w(0, 'Warning ' + IntToStr(Ctr), Data) else
-    if (Ctr mod 4) = 0 then
+    if (Ctr mod 5) = 4 then
       _Log.e(0, 'Error ' + IntToStr(Ctr), Data);
+    if (Ctr mod 5) = 0 then
+      _Log.x(0, 'Exception ' + IntToStr(Ctr), Data);
     Inc(Ctr);
 
     Sleep(2);
   end;
 
+  SetLength(Data, 256);
+  for i := Low(Data) to High(Data) do
+    Data[i] := Byte(i + 1);
+
+  s := '';
+  for i := 1 to 23 do
+    s := s + '1234567890'; // 230B
+
+  _Log.i(1, 'Long message test (>255B) '{26B} + s, Data);
+  _Log.i(1, 'Unicode: ' + Chr(169) + Chr(174) + Chr(920) + Chr(937) + Chr(1422) + Chr(8267));
+
+  SetLength(Data, 0);
   SetReturnValue(Ctr - 1);
 end;
 

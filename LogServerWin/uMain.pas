@@ -58,6 +58,9 @@ type
     actLogImgSave: TAction;
     dlgSaveImg: TSavePictureDialog;
     IdSocksServer1: TIdSocksServer;
+    pnlDetails: TPanel;
+    edtMessage: TEdit;
+    edtData: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -110,11 +113,12 @@ const
   COL_MESSAGE   = 4;
   COL_DATA      = 5;
 
-  IMG_EMPTY   = -1;
-  IMG_DEBUG   = 0;
-  IMG_INFO    = 1;
-  IMG_WARNING = 2;
-  IMG_ERROR   = 3;
+  IMG_EMPTY     = -1;
+  IMG_DEBUG     = 0;
+  IMG_INFO      = 1;
+  IMG_WARNING   = 2;
+  IMG_ERROR     = 3;
+  IMG_EXCEPTION = 4;
 
   FILE_CSV = 1;
   FILE_PNG = 1;
@@ -130,12 +134,7 @@ const
 
 procedure TfrmMain.actLogClearExecute(Sender: TObject);
 begin
-  vList.BeginUpdate;
-  try
-    vList.Clear;
-  finally
-    vList.EndUpdate;
-  end;
+  vList.Clear;
 end;
 
 procedure TfrmMain.actLogCopyExecute(Sender: TObject);
@@ -394,10 +393,11 @@ begin
   end else
   begin
     case AData.LogPriority of
-      prDebug:   StringBuilder.Append('Debug').Append(ASeparator);
-      prInfo:    StringBuilder.Append('Info').Append(ASeparator);
-      prWarning: StringBuilder.Append('Warning').Append(ASeparator);
-      prError:   StringBuilder.Append('Error').Append(ASeparator);
+      prDebug    : StringBuilder.Append('Debug').Append(ASeparator);
+      prInfo     : StringBuilder.Append('Info').Append(ASeparator);
+      prWarning  : StringBuilder.Append('Warning').Append(ASeparator);
+      prError    : StringBuilder.Append('Error').Append(ASeparator);
+      prException: StringBuilder.Append('Exception').Append(ASeparator);
     else
       StringBuilder.Append(string.Empty).Append(ASeparator);
     end;
@@ -453,6 +453,8 @@ var
 begin
   if Sender.SelectedCount > 1 then
   begin
+    edtMessage.Text := '';
+    edtData.Text    := '';
     sbMain.Panels[SBAR_SEL_COUNT].Text := Format('Selected %d rows', [Sender.SelectedCount]);
     min := Cardinal.MaxValue;
     max := Cardinal.MinValue;
@@ -470,6 +472,19 @@ begin
   begin
     sbMain.Panels[SBAR_SEL_COUNT].Text := string.Empty;
     sbMain.Panels[SBAR_SEL_TIME].Text := string.Empty;
+    if Assigned(Node) then
+    begin
+      d := Sender.GetNodeData(Node);
+      if Assigned(d) then
+      begin
+        edtMessage.Text := d.LogMessage;
+        edtData.Text    := d.LogData;
+      end;
+    end else
+    begin
+      edtMessage.Text := '';
+      edtData.Text    := '';
+    end;
   end;
 end;
 
@@ -524,10 +539,11 @@ begin
 
     if Kind in [TVTImageKind.ikNormal, TVTImageKind.ikSelected] then
       case d.LogPriority of
-        prDebug:   ImageIndex := IMG_DEBUG;
-        prInfo:    ImageIndex := IMG_INFO;
-        prWarning: ImageIndex := IMG_WARNING;
-        prError:   ImageIndex := IMG_ERROR;
+        prDebug    : ImageIndex := IMG_DEBUG;
+        prInfo     : ImageIndex := IMG_INFO;
+        prWarning  : ImageIndex := IMG_WARNING;
+        prError    : ImageIndex := IMG_ERROR;
+        prException: ImageIndex := IMG_EXCEPTION;
       else
         ImageIndex := IMG_EMPTY;
       end;
@@ -564,7 +580,7 @@ begin
   Priority := Priority.ToLower;
 
   Result := False;
-  if Priority.Equals('all') and Client.IsEmpty and TypeNr.IsEmpty and Filter.IsEmpty then
+  if ((Priority = '') or Priority.Equals('all')) and Client.IsEmpty and TypeNr.IsEmpty and Filter.IsEmpty then
     SetNodeVisible(Node, True) else
   begin
     Data := vList.GetNodeData(Node);
@@ -572,10 +588,11 @@ begin
     if not Priority.Equals('all') then
     begin
       case Data.LogPriority of
-        TDNLogPriority.prDebug:   bVisible := Priority.Equals('debug');
-        TDNLogPriority.prInfo:    bVisible := Priority.Equals('info');
-        TDNLogPriority.prWarning: bVisible := Priority.Equals('warning');
-        TDNLogPriority.prError:   bVisible := Priority.Equals('error');
+        TDNLogPriority.prDebug    : bVisible := Priority.Equals('debug');
+        TDNLogPriority.prInfo     : bVisible := Priority.Equals('info');
+        TDNLogPriority.prWarning  : bVisible := Priority.Equals('warning');
+        TDNLogPriority.prError    : bVisible := Priority.Equals('error');
+        TDNLogPriority.prException: bVisible := Priority.Equals('exception');
       else
         bVisible := True;
       end;
