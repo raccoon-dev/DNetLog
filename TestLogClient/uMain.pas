@@ -35,22 +35,16 @@ var
 implementation
 
 uses
-  DNLog.Types, DNLog.Client;
+  DNLog.Client;
 
 {$R *.fmx}
 
 procedure TfrmMain.btnTestClick(Sender: TObject);
 begin
-  if _Log.Active then
-    _Log.Active := False;
-  _Log.Active := True;
   if not _Log.Active then
   begin
-{$IFDEF DEBUG}
-    TDialogServiceAsync.ShowMessage('Can''t open TCP/UDP socket for Log Client.');
-{$ELSE}
-    TDialogServiceAsync.ShowMessage('Logs are disabled in RELEASE mode.');
-{$ENDIF}
+    _Log.i('This message will not be send');
+    TDialogServiceAsync.ShowMessage('Logs are disabled.');
     Exit;
   end;
 

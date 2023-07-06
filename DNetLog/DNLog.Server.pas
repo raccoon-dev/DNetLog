@@ -33,7 +33,7 @@ end;
 implementation
 
 const
-  MB1 = 1024 * 1024;
+  DEFAULT_UDP_BUFFER_LENGTH = 20*1024*1024; // 20 [MB]
 
 { TDNLogServer }
 
@@ -46,7 +46,7 @@ begin
   FServerUDP := TIdUDPServer.Create(nil);
   FServerUDP.DefaultPort := SERVER_BIND_PORT;
   FServerUDP.IPVersion := TIdIPVersion.Id_IPv4;
-  FServerUDP.BufferSize := SERVER_BUFFER_SIZE * MB1; // [MB]
+  FServerUDP.BufferSize := DEFAULT_UDP_BUFFER_LENGTH;
   sockh := FServerUDP.Bindings.Add;
   sockh.SetBinding(SERVER_BIND_ADDRESS_4, SERVER_BIND_PORT, TIdIPVersion.Id_IPv4);
   sockh := FServerUDP.Bindings.Add;
