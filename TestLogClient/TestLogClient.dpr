@@ -6,7 +6,8 @@ uses
   uMain in 'uMain.pas' {frmMain},
   DNLog.Client in '..\DNetLog\DNLog.Client.pas',
   DNLog.Types in '..\DNetLog\DNLog.Types.pas',
-  DNLog.Sender in '..\DNetLog\DNLog.Sender.pas';
+  DNLog.Sender in '..\DNetLog\DNLog.Sender.pas',
+  DNLog.Thread in '..\DNetLog\DNLog.Thread.pas';
 
 {$R *.res}
 

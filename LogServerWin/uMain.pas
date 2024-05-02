@@ -86,11 +86,11 @@ type
   private
     { Private declarations }
     FServer: TDNLogServer;
-    procedure _OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
+    procedure _OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessages: TDNLogMessages);
     procedure LogRowToString(AData: PLogNode; StringBuilder: TStringBuilder; const ASeparator: String; const AAddNewLine: Boolean; const AGetHeader: Boolean = False);
     procedure ExportCSV(StringBuilder: TStringBuilder);
     procedure FilterLog(Priority, Client, TypeNr, Filter: string);
-    function _FilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
+    function  _FilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
     function  BytesToStr(Bytes: TBytes): string;
     function  GetLogBitmap: TBitmap;
@@ -342,8 +342,8 @@ var
 begin
   vList.BeginUpdate;
   try
-  for Node in vList.Nodes do
-    _FilterLog(Node, Priority, Client, TypeNr, Filter);
+    for Node in vList.Nodes do
+      _FilterLog(Node, Priority, Client, TypeNr, Filter);
   finally
     vList.EndUpdate;
   end;
@@ -633,51 +633,55 @@ begin
 end;
 
 procedure TfrmMain._OnLogReceived(Sender: TObject; const ClientIP: string;
-  const LogMessage: TDNLogMessage);
+  const LogMessages: TDNLogMessages);
 var
   Node, Nod: PVirtualNode;
   Data: PLogNode;
 begin
   vList.BeginUpdate;
   try
-    vList.RootNodeCount := vList.RootNodeCount + 1;
-    Node := vList.GetLast;
-    if Assigned(Node) then
+    for var i := 0 to LogMessages.Count - 1 do
     begin
-      Data := vList.GetNodeData(Node);
-      if Assigned(Data) then
+      var LogMessage := LogMessages[i];
+      vList.RootNodeCount := vList.RootNodeCount + 1;
+      Node := vList.GetLast;
+      if Assigned(Node) then
       begin
-        Data.LogPriority        := LogMessage.LogPriority;
-        Data.LogTimestamp       := LogMessage.LogTimestamp;
-        Data.LogTimestampString := IntToStr(Data.LogTimestamp);
-        Data.LogClient          := ClientIP;
-        Data.LogTypeNr          := LogMessage.LogTypeNr;
-        Data.LogTypeNrString    := IntToStr(Data.LogTypeNr);
-        Data.LogMessage         := LogMessage.LogMessage;
-        Data.LogMessageLC       := Data.LogMessage.ToLower;
-        SetLength(Data.LogDataRaw, Length(LogMessage.LogData));
-        System.Move(LogMessage.LogData[0], Data.LogDataRaw[0], Length(LogMessage.LogData));
-        Data.LogData            := BytesToStr(Data.LogDataRaw);
+        Data := vList.GetNodeData(Node);
+        if Assigned(Data) then
+        begin
+          Data.LogPriority        := LogMessage.LogPriority;
+          Data.LogTimestamp       := LogMessage.LogTimestamp;
+          Data.LogTimestampString := IntToStr(Data.LogTimestamp);
+          Data.LogClient          := ClientIP;
+          Data.LogTypeNr          := LogMessage.LogTypeNr;
+          Data.LogTypeNrString    := IntToStr(Data.LogTypeNr);
+          Data.LogMessage         := LogMessage.LogMessage;
+          Data.LogMessageLC       := Data.LogMessage.ToLower;
+          SetLength(Data.LogDataRaw, Length(LogMessage.LogData));
+          System.Move(LogMessage.LogData[0], Data.LogDataRaw[0], Length(LogMessage.LogData));
+          Data.LogData            := BytesToStr(Data.LogDataRaw);
+        end else
+          Exit;
       end else
         Exit;
-    end else
-      Exit;
 
-    if cbClient.Items.IndexOf(Data.LogClient) < 0 then
-      cbClient.Items.Append(Data.LogClient);
+      if cbClient.Items.IndexOf(Data.LogClient) < 0 then
+        cbClient.Items.Append(Data.LogClient);
 
-    if cbTypeNr.Items.IndexOf(Data.LogTypeNrString) < 0 then
-      cbTypeNr.Items.Append(Data.LogTypeNrString);
+      if cbTypeNr.Items.IndexOf(Data.LogTypeNrString) < 0 then
+        cbTypeNr.Items.Append(Data.LogTypeNrString);
 
-    if not _FilterLog(Node, cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text) then
-      if chkAutoScroll.Checked then
-      begin
-        vList.FocusedNode := Node;
-        for Nod in vList.SelectedNodes do
-          vList.Selected[Nod] := False;
-        vList.Selected[Node] := True;
-        vList.ScrollIntoView(Node, false);
-      end;
+      if not _FilterLog(Node, cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text) then
+        if chkAutoScroll.Checked then
+        begin
+          vList.FocusedNode := Node;
+          for Nod in vList.SelectedNodes do
+            vList.Selected[Nod] := False;
+          vList.Selected[Node] := True;
+          vList.ScrollIntoView(Node, false);
+        end;
+    end;
   finally
     vList.EndUpdate;
   end;

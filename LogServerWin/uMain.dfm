@@ -39,10 +39,8 @@ object frmMain: TfrmMain
     000000000000000000000000000000C8F1FF39CDFFF9FEFF000000000000FFC1
     0000FF800000E0000000C0080000C0000000E0000000C0010000E0070000E007
     0000C0000000E0000000C0000000C0010000E0010000FFC30000FFE30000}
-  OldCreateOrder = False
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  PixelsPerInch = 96
   TextHeight = 13
   object pnlFilters: TPanel
     Left = 0
@@ -209,6 +207,23 @@ object frmMain: TfrmMain
     Width = 729
     Height = 391
     Align = alClient
+    Colors.BorderColor = 5195575
+    Colors.DisabledColor = clGray
+    Colors.DropMarkColor = 11054205
+    Colors.DropTargetColor = 11054205
+    Colors.DropTargetBorderColor = 11054205
+    Colors.FocusedSelectionColor = 11054205
+    Colors.FocusedSelectionBorderColor = 11054205
+    Colors.GridLineColor = 5195575
+    Colors.HeaderHotColor = 11054205
+    Colors.HotColor = clWhite
+    Colors.SelectionRectangleBlendColor = 11054205
+    Colors.SelectionRectangleBorderColor = 11054205
+    Colors.SelectionTextColor = clWhite
+    Colors.TreeLineColor = 9471874
+    Colors.UnfocusedColor = clWhite
+    Colors.UnfocusedSelectionColor = 5195575
+    Colors.UnfocusedSelectionBorderColor = 5195575
     DrawSelectionMode = smBlendedRectangle
     Header.AutoSizeIndex = 3
     Header.Height = 32
@@ -234,8 +249,8 @@ object frmMain: TfrmMain
     OnGetText = vListGetText
     OnGetImageIndex = vListGetImageIndex
     OnGetHint = vListGetHint
-    ExplicitTop = 63
-    ExplicitHeight = 399
+    Touch.InteractiveGestures = [igPan, igPressAndTap]
+    Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
     Columns = <
       item
         Alignment = taCenter
@@ -313,7 +328,6 @@ object frmMain: TfrmMain
       Color = clBtnFace
       ReadOnly = True
       TabOrder = 0
-      ExplicitTop = 6
     end
     object edtData: TEdit
       Left = 0
@@ -327,7 +341,6 @@ object frmMain: TfrmMain
       Color = clBtnFace
       ReadOnly = True
       TabOrder = 1
-      ExplicitTop = 23
     end
     object sbMain: TStatusBar
       Left = 0
@@ -341,7 +354,6 @@ object frmMain: TfrmMain
         item
           Width = 200
         end>
-      ExplicitTop = 506
     end
   end
   object ilType: TImageList

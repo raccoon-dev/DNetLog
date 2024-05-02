@@ -10,7 +10,7 @@ interface
 
 uses
   DNLog.Types, DNLog.Sender, System.SysUtils, System.classes, System.IOUtils,
-  IdGlobal;
+  IdGlobal, DNLog.Thread;
 
 type TDNLogClient = class(TObject)
   strict private
@@ -21,42 +21,68 @@ type TDNLogClient = class(TObject)
     class function GetInstance: TDNLogClient; static; inline;
     class function GetActive: Boolean; static; inline;
   private
-    FDNLogSender: IDNLogSender;
+    FDNSendThread: TDNSendThread;
   protected
     procedure LogRaw(Priority: TDNLogPriority; LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
   public
     constructor Create(DNLogSender: IDNLogSender);
     class destructor Destroy;
     class property Active: Boolean read GetActive;
+    class function QueueCount: Integer;
     // Singleton management
     class property Instance: TDNLogClient read GetInstance;
     class function NewInstance: TObject; override;
     procedure FreeInstance; override;
     // Debug
-    procedure d(LogMessage: string); overload; inline;
-    procedure d(LogMessage: string; LogData: TBytes); overload; inline;
-    procedure d(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
-    procedure d(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
+    procedure d(const LogMessage: string); overload; inline;
+    procedure d(const LogMessage: string; const LogData: TBytes); overload; inline;
+    procedure d(const LogTypeNr: ShortInt; const LogMessage: string); overload; inline;
+    procedure d(const LogTypeNr: ShortInt; const LogMessage: string; const LogData: TBytes); overload; inline;
+    //
+    procedure d(const LogMessage: string; const Args: array of const); overload;
+    procedure d(const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
+    procedure d(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const); overload;
+    procedure d(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
     // Information
-    procedure i(LogMessage: string); overload; inline;
-    procedure i(LogMessage: string; LogData: TBytes); overload; inline;
-    procedure i(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
-    procedure i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
+    procedure i(const LogMessage: string); overload; inline;
+    procedure i(const LogMessage: string; const LogData: TBytes); overload; inline;
+    procedure i(const LogTypeNr: ShortInt; const LogMessage: string); overload; inline;
+    procedure i(const LogTypeNr: ShortInt; const LogMessage: string; const LogData: TBytes); overload; inline;
+    //
+    procedure i(const LogMessage: string; const Args: array of const); overload;
+    procedure i(const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
+    procedure i(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const); overload;
+    procedure i(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
     // Warning
-    procedure w(LogMessage: string); overload; inline;
-    procedure w(LogMessage: string; LogData: TBytes); overload; inline;
-    procedure w(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
-    procedure w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
+    procedure w(const LogMessage: string); overload; inline;
+    procedure w(const LogMessage: string; const LogData: TBytes); overload; inline;
+    procedure w(const LogTypeNr: ShortInt; const LogMessage: string); overload; inline;
+    procedure w(const LogTypeNr: ShortInt; const LogMessage: string; const LogData: TBytes); overload; inline;
+    //
+    procedure w(const LogMessage: string; const Args: array of const); overload;
+    procedure w(const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
+    procedure w(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const); overload;
+    procedure w(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
     // Error
-    procedure e(LogMessage: string); overload; inline;
-    procedure e(LogMessage: string; LogData: TBytes); overload; inline;
-    procedure e(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
-    procedure e(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
+    procedure e(const LogMessage: string); overload; inline;
+    procedure e(const LogMessage: string; const LogData: TBytes); overload; inline;
+    procedure e(const LogTypeNr: ShortInt; const LogMessage: string); overload; inline;
+    procedure e(const LogTypeNr: ShortInt; const LogMessage: string; const LogData: TBytes); overload; inline;
+    //
+    procedure e(const LogMessage: string; const Args: array of const); overload;
+    procedure e(const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
+    procedure e(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const); overload;
+    procedure e(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
     // Exception
-    procedure x(LogMessage: string); overload; inline;
-    procedure x(LogMessage: string; LogData: TBytes); overload; inline;
-    procedure x(LogTypeNr: ShortInt; LogMessage: string); overload; inline;
-    procedure x(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes); overload; inline;
+    procedure x(const LogMessage: string); overload; inline;
+    procedure x(const LogMessage: string; const LogData: TBytes); overload; inline;
+    procedure x(const LogTypeNr: ShortInt; const LogMessage: string); overload; inline;
+    procedure x(const LogTypeNr: ShortInt; const LogMessage: string; const LogData: TBytes); overload; inline;
+    //
+    procedure x(const LogMessage: string; const Args: array of const); overload;
+    procedure x(const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
+    procedure x(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const); overload;
+    procedure x(const LogTypeNr: ShortInt; const LogMessage: string; const Args: array of const; const LogData: TBytes); overload;
 end;
 
 
@@ -64,9 +90,6 @@ function _Log: TDNLogClient; inline;
 
 
 implementation
-
-var
-  FLogClient: TDNLogClient;
 
 function _Log: TDNLogClient;
 begin
@@ -84,23 +107,53 @@ begin
   Assert(Assigned(DNLogSender));
   inherited Create;
 {$IFDEF LOGS}
-  FDNLogSender := DNLogSender;
+  FDNSendThread := TDNSendThread.Create(DNLogSender);
 {$ENDIF}
 end;
 
 class destructor TDNLogClient.Destroy;
 begin
+  if _Log <> nil then
+    _Log.FDNSendThread.Terminate;
   FShuttingDown := true;
-{$IFDEF LOGS}
-  FreeAndNil(FDNLogClient);
-{$ENDIF}
   inherited;
+end;
+
+procedure TDNLogClient.e(const LogMessage: string; const Args: array of const);
+begin
+{$IFDEF LOGS}
+  e(Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.e(const LogMessage: string; const Args: array of const;
+  const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  e(Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.e(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const);
+begin
+{$IFDEF LOGS}
+  e(LogTypeNr, Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.e(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const; const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  e(LogTypeNr, Format(LogMessage, Args), LogData);
+{$ENDIF}
 end;
 
 class function TDNLogClient.GetActive: Boolean;
 begin
 {$IFDEF LOGS}
-  Result := Assigned(TDNLogClient.Instance) and TDNLogClient.Instance.FDNLogSender.Connected;
+  Result := Assigned(TDNLogClient.Instance) and TDNLogClient.Instance.FDNSendThread.Connected;
 {$ELSE}
   Result := False;
 {$ENDIF}
@@ -125,37 +178,68 @@ begin
 {$ENDIF}
 end;
 
-procedure TDNLogClient.d(LogMessage: string);
+procedure TDNLogClient.i(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const; const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  i(LogTypeNr, Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.i(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const);
+begin
+{$IFDEF LOGS}
+  i(LogTypeNr, Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.i(const LogMessage: string; const Args: array of const);
+begin
+{$IFDEF LOGS}
+  i(Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.i(const LogMessage: string; const Args: array of const;
+  const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  i(Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.d(const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prDebug, 0, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.d(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.d(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prDebug, LogTypeNr, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.d(LogTypeNr: ShortInt; LogMessage: string;
-  LogData: TBytes);
+procedure TDNLogClient.d(const LogTypeNr: ShortInt; const LogMessage: string;
+  const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prDebug, LogTypeNr, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.d(LogMessage: string; LogData: TBytes);
+procedure TDNLogClient.d(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prDebug, 0, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.e(LogTypeNr: ShortInt; LogMessage: string;
-  LogData: TBytes);
+procedure TDNLogClient.e(const LogTypeNr: ShortInt; const LogMessage: string;
+  const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, LogData);
@@ -165,53 +249,58 @@ end;
 procedure TDNLogClient.FreeInstance;
 begin
   if FShuttingDown then
+  begin
+{$IFDEF LOGS}
+    FDNSendThread.Terminate;
+{$ENDIF}
     inherited;
+  end;
 end;
 
-procedure TDNLogClient.e(LogMessage: string; LogData: TBytes);
+procedure TDNLogClient.e(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prError, 0, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.e(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.e(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.e(LogMessage: string);
+procedure TDNLogClient.e(const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prError, 0, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.i(LogMessage: string);
+procedure TDNLogClient.i(const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prInfo, 0, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.i(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.i(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prInfo, LogTypeNr, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.i(LogTypeNr: ShortInt; LogMessage: string;
-  LogData: TBytes);
+procedure TDNLogClient.i(const LogTypeNr: ShortInt; const LogMessage: string;
+  const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prInfo, LogTypeNr, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.i(LogMessage: string; LogData: TBytes);
+procedure TDNLogClient.i(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prInfo, 0, LogMessage, LogData);
@@ -222,7 +311,7 @@ procedure TDNLogClient.LogRaw(Priority: TDNLogPriority; LogTypeNr: ShortInt;
   LogMessage: string; LogData: TBytes);
 {$IFDEF LOGS}
 var
-  sendBuffer: TIdBytes;
+  sendBuffer: TBytes;
   dt: Cardinal;
   logMessageUTF8: TBytes;
 {$ENDIF}
@@ -233,36 +322,41 @@ begin
 
   dt := TThread.GetTickCount;
   logMessageUTF8 := TEncoding.UTF8.GetBytes(LogMessage);
-  SetLength(sendBuffer,
-            1 {Priority} +
-            4 {timestamp} +
-            1 {TypeNr} +
-            2 {Message Length} +
-            2 {Data Length} +
-            Length(logMessageUTF8) +
-            Length(LogData));
+  var len := 3 {Length} +
+             1 {Priority} +
+             4 {timestamp} +
+             1 {TypeNr} +
+             2 {Message Length} +
+             2 {Data Length} +
+             Length(logMessageUTF8) +
+             Length(LogData);
 
-  sendBuffer[0] := Ord(Priority);   {Priority}
-  sendBuffer[1] := Byte(dt shr 24); {timestamp}
-  sendBuffer[2] := Byte(dt shr 16); {timestamp}
-  sendBuffer[3] := Byte(dt shr 8);  {timestamp}
-  sendBuffer[4] := Byte(dt);        {timestamp}
-  sendBuffer[5] := LogTypeNr;       {TypeNr}
-  sendBuffer[6] := Byte(Length(logMessageUTF8) shr 8); {Message Length}
-  sendBuffer[7] := Byte(Length(logMessageUTF8));       {Message Length}
+  SetLength(sendBuffer, len);
+
+  sendBuffer[0]  := Byte(len shr 16); {Length}
+  sendBuffer[1]  := Byte(len shr 8); {Length}
+  sendBuffer[2]  := Byte(len); {Length}
+  sendBuffer[3]  := Ord(Priority);   {Priority}
+  sendBuffer[4]  := Byte(dt shr 24); {timestamp}
+  sendBuffer[5]  := Byte(dt shr 16); {timestamp}
+  sendBuffer[6]  := Byte(dt shr 8);  {timestamp}
+  sendBuffer[7]  := Byte(dt);        {timestamp}
+  sendBuffer[8]  := LogTypeNr;       {TypeNr}
+  sendBuffer[9]  := Byte(Length(logMessageUTF8) shr 8); {Message Length}
+  sendBuffer[10] := Byte(Length(logMessageUTF8));       {Message Length}
 
   {Message}
   if Length(logMessageUTF8) > 0 then
-    System.Move(logMessageUTF8[0], sendBuffer[8], Length(logMessageUTF8));
+    System.Move(logMessageUTF8[0], sendBuffer[11], Length(logMessageUTF8));
 
-  sendBuffer[8 + Length(logMessageUTF8)] := Byte(Length(LogData) shr 8); {Data Length}
-  sendBuffer[9 + Length(logMessageUTF8)] := Byte(Length(LogData));       {Data Length}
+  sendBuffer[11 + Length(logMessageUTF8)] := Byte(Length(LogData) shr 8); {Data Length}
+  sendBuffer[12 + Length(logMessageUTF8)] := Byte(Length(LogData));       {Data Length}
 
   {Data}
   if Length(LogData) > 0 then
-    System.Move(LogData[0], sendBuffer[10 + Length(logMessageUTF8)], Length(LogData));
+    System.Move(LogData[0], sendBuffer[13 + Length(logMessageUTF8)], Length(LogData));
 
-  FDNLogSender.Write(sendBuffer);
+  FDNSendThread.Send(sendBuffer);
 {$ENDIF}
 end;
 
@@ -277,61 +371,163 @@ begin
 {$ENDIF}
 end;
 
-procedure TDNLogClient.x(LogMessage: string);
+class function TDNLogClient.QueueCount: Integer;
+begin
+  Result := 0;
+{$IFDEF LOGS}
+  if Assigned(TDNLogClient.Instance) then
+    Result := TDNLogClient.Instance.FDNSendThread.Count;
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prException, 0, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.x(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.x(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prException, LogTypeNr, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.x(LogTypeNr: ShortInt; LogMessage: string;
-  LogData: TBytes);
+procedure TDNLogClient.x(const LogTypeNr: ShortInt; const LogMessage: string;
+  const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prException, LogTypeNr, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.w(LogTypeNr: ShortInt; LogMessage: string;
-  LogData: TBytes);
+procedure TDNLogClient.w(const LogTypeNr: ShortInt; const LogMessage: string;
+  const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.x(LogMessage: string; LogData: TBytes);
+procedure TDNLogClient.x(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prException, 0, LogMessage, LogData);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.w(LogTypeNr: ShortInt; LogMessage: string);
+procedure TDNLogClient.w(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.w(LogMessage: string);
+procedure TDNLogClient.w(const LogMessage: string);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prWarning, 0, LogMessage, nil);
 {$ENDIF}
 end;
 
-procedure TDNLogClient.w(LogMessage: string; LogData: TBytes);
+procedure TDNLogClient.w(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF LOGS}
   LogRaw(TDNLogPriority.prWarning, 0, LogMessage, LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.d(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const; const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  d(LogTypeNr, Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.d(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const);
+begin
+{$IFDEF LOGS}
+  d(LogTypeNr, Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.d(const LogMessage: string; const Args: array of const;
+  const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  d(Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.d(const LogMessage: string; const Args: array of const);
+begin
+{$IFDEF LOGS}
+  d(Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.w(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const);
+begin
+{$IFDEF LOGS}
+  w(LogTypeNr, Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.w(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const; const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  w(LogTypeNr, Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.w(const LogMessage: string; const Args: array of const;
+  const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  w(Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.w(const LogMessage: string; const Args: array of const);
+begin
+{$IFDEF LOGS}
+  w(Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const; const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  x(LogTypeNr, Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(const LogTypeNr: ShortInt; const LogMessage: string;
+  const Args: array of const);
+begin
+{$IFDEF LOGS}
+  x(LogTypeNr, Format(LogMessage, Args));
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(const LogMessage: string; const Args: array of const;
+  const LogData: TBytes);
+begin
+{$IFDEF LOGS}
+  x(Format(LogMessage, Args), LogData);
+{$ENDIF}
+end;
+
+procedure TDNLogClient.x(const LogMessage: string; const Args: array of const);
+begin
+{$IFDEF LOGS}
+  x(Format(LogMessage, Args));
 {$ENDIF}
 end;
 

@@ -5,23 +5,30 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, FMX.DialogService.Async,
-  FMX.Controls.Presentation, FMX.StdCtrls, FMX.Layouts;
+  FMX.Controls.Presentation, FMX.StdCtrls, FMX.Layouts, FMX.Memo.Types, FMX.ScrollBox, FMX.Memo;
 
 const
   TEST_TIME = 3; // [sec]
 
 type TThreadTest = class(TThread)
+  strict private
+    procedure Sleep; inline;
   protected
     procedure Execute; override;
 end;
 
 type
   TfrmMain = class(TForm)
-    layMain: TFlowLayout;
     btnTest: TButton;
     tmrTest: TTimer;
+    Layout1: TLayout;
+    MemoLog: TMemo;
+    ProgressBarQueue: TProgressBar;
+    TimerQueue: TTimer;
     procedure tmrTestTimer(Sender: TObject);
     procedure btnTestClick(Sender: TObject);
+    procedure TimerQueueTimer(Sender: TObject);
+    procedure FormShow(Sender: TObject);
   private
     { Private declarations }
     thrTest: TThreadTest;
@@ -35,7 +42,10 @@ var
 implementation
 
 uses
-  DNLog.Client;
+  DNLog.Client, DNLog.Types, DNLog.Thread;
+
+const
+  DELAY_COUNT = 500; // X * 1000
 
 {$R *.fmx}
 
@@ -49,12 +59,31 @@ begin
   end;
 
   btnTest.Enabled := False;
+  ProgressBarQueue.Value := 0;
+  ProgressBarQueue.Max := 100;
+  TimerQueue.Enabled := True;
+  MemoLog.Lines.Append('----------' + sLineBreak + 'Test started...');
   tmrTest.Interval := TEST_TIME * 1000;
 
   thrTest := TThreadTest.Create(True);
 
   tmrTest.Enabled := True;
   thrTest.Start;
+end;
+
+procedure TfrmMain.FormShow(Sender: TObject);
+begin
+  MemoLog.Lines.Clear;
+  ProgressBarQueue.Value := 0;
+end;
+
+procedure TfrmMain.TimerQueueTimer(Sender: TObject);
+begin
+  var count := _Log.QueueCount;
+  if count > ProgressBarQueue.Max then
+    ProgressBarQueue.Max := count;
+  ProgressBarQueue.Value := count;
+
 end;
 
 procedure TfrmMain.tmrTestTimer(Sender: TObject);
@@ -74,7 +103,7 @@ begin
        .Append('Sent packets: ').Append(SendCounter).AppendLine
        .Append('Sent packets/sec: ').Append(SendCounter div TEST_TIME);
 
-    TDialogServiceAsync.ShowMessage(str.ToString);
+    MemoLog.Lines.Append(str.ToString);
   finally
     str.Free;
   end;
@@ -110,7 +139,7 @@ begin
       _Log.x(0, 'Exception ' + IntToStr(Ctr), Data);
     Inc(Ctr);
 
-    Sleep(2);
+    Sleep;
   end;
 
   SetLength(Data, 256);
@@ -126,6 +155,11 @@ begin
 
   SetLength(Data, 0);
   SetReturnValue(Ctr - 1);
+end;
+
+procedure TThreadTest.Sleep;
+begin
+  for var i := 1 to DELAY_COUNT * 1000 do;
 end;
 
 end.

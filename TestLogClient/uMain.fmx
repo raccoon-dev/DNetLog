@@ -4,36 +4,68 @@ object frmMain: TfrmMain
   Caption = 'Test DNetLog Client'
   ClientHeight = 480
   ClientWidth = 640
+  Padding.Left = 15.000000000000000000
+  Padding.Top = 15.000000000000000000
+  Padding.Right = 15.000000000000000000
+  Padding.Bottom = 15.000000000000000000
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
+  OnShow = FormShow
   DesignerMasterStyle = 0
-  object layMain: TFlowLayout
-    Align = Client
-    Margins.Left = 5.000000000000000000
-    Margins.Top = 5.000000000000000000
-    Margins.Right = 5.000000000000000000
-    Margins.Bottom = 5.000000000000000000
-    Size.Width = 630.000000000000000000
-    Size.Height = 470.000000000000000000
+  object tmrTest: TTimer
+    Enabled = False
+    OnTimer = tmrTestTimer
+    Left = 269
+    Top = 157
+  end
+  object Layout1: TLayout
+    Align = Top
+    Margins.Bottom = 15.000000000000000000
+    Position.X = 15.000000000000000000
+    Position.Y = 15.000000000000000000
+    Size.Width = 610.000000000000000000
+    Size.Height = 34.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 0
-    Justify = Left
-    JustifyLastLine = Left
-    FlowDirection = LeftToRight
+    TabOrder = 1
     object btnTest: TButton
+      Align = Left
       Size.Width = 129.000000000000000000
-      Size.Height = 41.000000000000000000
+      Size.Height = 34.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       Text = 'Test'
       OnClick = btnTestClick
     end
   end
-  object tmrTest: TTimer
+  object MemoLog: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    ReadOnly = True
+    Align = Client
+    Size.Width = 570.000000000000000000
+    Size.Height = 401.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Viewport.Width = 566.000000000000000000
+    Viewport.Height = 397.000000000000000000
+  end
+  object ProgressBarQueue: TProgressBar
+    Align = Right
+    Orientation = Vertical
+    Margins.Left = 15.000000000000000000
+    Position.X = 600.000000000000000000
+    Position.Y = 64.000000000000000000
+    Size.Width = 25.000000000000000000
+    Size.Height = 401.000000000000000000
+    Size.PlatformDefault = False
+    Value = 50.000000000000000000
+  end
+  object TimerQueue: TTimer
     Enabled = False
-    OnTimer = tmrTestTimer
-    Left = 269
-    Top = 157
+    Interval = 500
+    OnTimer = TimerQueueTimer
+    Left = 231
+    Top = 248
   end
 end

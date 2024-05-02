@@ -3,11 +3,11 @@ unit DNLog.Sender;
 interface
 
 uses
-  IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal, IdTCPClient;
+  IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal, IdTCPClient, System.SysUtils;
 
 type IDNLogSender = interface(IInterface)
   ['{AD968E05-E6A8-4A5C-A4DE-5C14199D4101}']
-  procedure Write(IdBytes: TIdBytes);
+  procedure Write(Bytes: TBytes);
   function GetConnected: Boolean;
   procedure SetConnected(Value: Boolean);
   property Connected: Boolean read GetConnected write SetConnected;
@@ -19,7 +19,7 @@ type TDNLogSenderTCP = class(TInterfacedObject, IDNLogSender)
   public
     constructor Create(Address: String; Port: Word);
     destructor Destroy; override;
-    procedure Write(IdBytes: TIdBytes);
+    procedure Write(Bytes: TBytes);
     function GetConnected: Boolean;
     procedure SetConnected(Value: Boolean);
     property Connected: Boolean read GetConnected write SetConnected;
@@ -31,7 +31,7 @@ type TDNLogSenderUDP = class(TInterfacedObject, IDNLogSender)
   public
     constructor Create(Address: String; Port: Word);
     destructor Destroy; override;
-    procedure Write(IdBytes: TIdBytes);
+    procedure Write(Bytes: TBytes);
     function GetConnected: Boolean;
     procedure SetConnected(Value: Boolean);
     property Connected: Boolean read GetConnected write SetConnected;
@@ -76,9 +76,9 @@ begin
   end;
 end;
 
-procedure TDNLogSenderTCP.Write(IdBytes: TIdBytes);
+procedure TDNLogSenderTCP.Write(Bytes: TBytes);
 begin
-  FIdTCPClient.Socket.Write(IdBytes, Length(IdBytes));
+  FIdTCPClient.Socket.Write(TIdBytes(Bytes), Length(Bytes));
 end;
 
 { TDNLogSenderUDP }
@@ -117,9 +117,9 @@ begin
   end;
 end;
 
-procedure TDNLogSenderUDP.Write(IdBytes: TIdBytes);
+procedure TDNLogSenderUDP.Write(Bytes: TBytes);
 begin
-  FIdUDPClient.SendBuffer(IdBytes);
+  FIdUDPClient.SendBuffer(TIdBytes(Bytes));
 end;
 
 end.
