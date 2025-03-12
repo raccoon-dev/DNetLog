@@ -977,7 +977,6 @@ object frmMain: TfrmMain
     end
     object mCopyMessage: TMenuItem
       Action = actMessageCopy
-      OnClick = mCopyMessageClick
     end
     object mCopyLog: TMenuItem
       Action = actLogCopy
@@ -1021,6 +1020,7 @@ object frmMain: TfrmMain
     end
     object actMessageCopy: TAction
       Caption = 'Copy Message'
+      OnExecute = actMessageCopyExecute
     end
   end
   object dlgSave: TSaveTextFileDialog

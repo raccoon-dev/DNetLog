@@ -166,7 +166,10 @@
             </Delphi.Personality>
             <Deployment Version="4">
                 <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput"/>
+                <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.rsm" Configuration="Debug" Class="DebugSymbols"/>
+                <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.rsm" Configuration="Debug" Class="DebugSymbols"/>
+                <DeployFile LocalName="Win32\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployFile LocalName="Win32\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployClass Name="AdditionalDebugSymbols">
                     <Platform Name="iOSSimulator">

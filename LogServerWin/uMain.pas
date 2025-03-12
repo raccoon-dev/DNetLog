@@ -129,8 +129,8 @@ type
       var HintText: string);
     procedure actLogImgCopyExecute(Sender: TObject);
     procedure actLogImgSaveExecute(Sender: TObject);
+    procedure actMessageCopyExecute(Sender: TObject);
     procedure FormShow(Sender: TObject);
-    procedure mCopyMessageClick(Sender: TObject);
   private
     { Private declarations }
     FServer: TDNLogServer;
@@ -322,6 +322,19 @@ begin
   end;
 end;
 
+procedure TfrmMain.actMessageCopyExecute(Sender: TObject);
+begin
+  var Node := vList.FocusedNode;
+  if not Assigned(Node) then
+  begin
+    Clipboard.AsText := '';
+    Exit;
+  end;
+
+  var Data: PLogNode := vList.GetNodeData(Node);
+  Clipboard.AsText := Data.LogMessage;
+end;
+
 function TfrmMain.BitmapToPng(ABitmap: TBitmap): TPNGImage;
 begin
   if Assigned(ABitmap) then
@@ -487,19 +500,6 @@ begin
 
   if AAddNewLine then
     StringBuilder.AppendLine;
-end;
-
-procedure TfrmMain.mCopyMessageClick(Sender: TObject);
-begin
-  var Node := vList.FocusedNode;
-  if not Assigned(Node) then
-  begin
-    Clipboard.AsText := '';
-    Exit;
-  end;
-
-  var Data: PLogNode := vList.GetNodeData(Node);
-  Clipboard.AsText := Data.LogMessage;
 end;
 
 procedure TfrmMain.pmnuMainPopup(Sender: TObject);
