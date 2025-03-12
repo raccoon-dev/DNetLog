@@ -16,27 +16,39 @@ end;
 type TDNLogSenderTCP = class(TInterfacedObject, IDNLogSender)
   private
     FIdTCPClient: TIdTCPClient;
+  protected
+    function GetConnected: Boolean;
+    procedure SetConnected(Value: Boolean);
   public
     constructor Create(Address: String; Port: Word);
     destructor Destroy; override;
     procedure Write(IdBytes: TIdBytes);
-    function GetConnected: Boolean;
-    procedure SetConnected(Value: Boolean);
     property Connected: Boolean read GetConnected write SetConnected;
 end;
 
 type TDNLogSenderUDP = class(TInterfacedObject, IDNLogSender)
   private
     FIdUDPClient: TIdUDPClient;
+  protected
+    function GetConnected: Boolean;
+    procedure SetConnected(Value: Boolean);
   public
     constructor Create(Address: String; Port: Word);
     destructor Destroy; override;
     procedure Write(IdBytes: TIdBytes);
-    function GetConnected: Boolean;
-    procedure SetConnected(Value: Boolean);
     property Connected: Boolean read GetConnected write SetConnected;
 end;
 
+type TDNLogSenderDummy = class(TInterfacedObject, IDNLogSender)
+  protected
+    function GetConnected: Boolean;
+    procedure SetConnected(Value: Boolean);
+  public
+    constructor Create(Address: String; Port: Word);
+    destructor Destroy; override;
+    procedure Write(IdBytes: TIdBytes);
+    property Connected: Boolean read GetConnected write SetConnected;
+end;
 
 implementation
 
@@ -120,6 +132,34 @@ end;
 procedure TDNLogSenderUDP.Write(IdBytes: TIdBytes);
 begin
   FIdUDPClient.SendBuffer(IdBytes);
+end;
+
+{ TDNLogSenderDummy }
+
+constructor TDNLogSenderDummy.Create(Address: String; Port: Word);
+begin
+  // nil
+end;
+
+destructor TDNLogSenderDummy.Destroy;
+begin
+  // nil
+  inherited;
+end;
+
+function TDNLogSenderDummy.GetConnected: Boolean;
+begin
+  Result := False;
+end;
+
+procedure TDNLogSenderDummy.SetConnected(Value: Boolean);
+begin
+  // nil
+end;
+
+procedure TDNLogSenderDummy.Write(IdBytes: TIdBytes);
+begin
+  // nil
 end;
 
 end.

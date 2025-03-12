@@ -27,6 +27,7 @@ object frmMain: TfrmMain
       Size.PlatformDefault = False
       TabOrder = 0
       Text = 'Test'
+      TextSettings.Trimming = None
       OnClick = btnTestClick
     end
   end

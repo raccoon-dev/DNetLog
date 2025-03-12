@@ -3,12 +3,38 @@
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees, Vcl.ExtCtrls,
-  System.ImageList, Vcl.ImgList, DNLog.Types, DNLog.Server, System.UITypes,
-  Vcl.StdCtrls, Vcl.Menus, Vcl.Buttons, System.Actions, Vcl.ActnList, Vcl.Clipbrd,
-  Vcl.ExtDlgs, System.IOUtils, Vcl.ComCtrls, Vcl.Imaging.pngimage,
-  IdBaseComponent, IdComponent, IdCustomTCPServer, IdSocksServer;
+  System.SysUtils,
+  System.Variants,
+  System.Classes,
+  System.ImageList,
+  System.UITypes,
+  System.Actions,
+  System.IOUtils,
+  System.Generics.Collections,
+  Winapi.Windows,
+  Winapi.Messages,
+  Vcl.Graphics,
+  Vcl.Controls,
+  Vcl.Forms,
+  Vcl.Dialogs,
+  Vcl.ExtCtrls,
+  Vcl.ImgList,
+  Vcl.StdCtrls,
+  Vcl.Menus,
+  Vcl.Buttons,
+  Vcl.ActnList,
+  Vcl.Clipbrd,
+  Vcl.ExtDlgs,
+  Vcl.ComCtrls,
+  Vcl.Imaging.pngimage,
+  VirtualTrees,
+  IdBaseComponent,
+  IdComponent,
+  IdCustomTCPServer,
+  IdSocksServer,
+  IdException,
+  DNLog.Types,
+  DNLog.Server;
 
 type
   PLogNode = ^TLogNode;
@@ -23,9 +49,27 @@ type
     LogMessageLC: string;
     LogDataRaw: TBytes;
     LogData: string;
-end;
+  end;
 
-type
+  TCLientLogMessage = record
+    ClientIP: string;
+    DNLogMessage: TDNLogMessage;
+    constructor Create(const ClientIP: string; const DNLogMessage: TDNLogMessage);
+  end;
+
+  TOnProcessLogs = procedure(const Logs: TArray<TCLientLogMessage>) of object;
+
+  TLogUpdateThread = class(TThread)
+  private
+    FLogs: TThreadList<TCLientLogMessage>;
+    FOnProcessLogs: TOnProcessLogs;
+    function Min(Value1, Value2: Integer): Integer; inline;
+  public
+    procedure Execute; override;
+    property Logs: TThreadList<TCLientLogMessage> read FLogs;
+    property OnProcessLogs: TOnProcessLogs read FOnProcessLogs write FOnProcessLogs;
+  end;
+
   TfrmMain = class(TForm)
     pnlFilters: TPanel;
     vList: TVirtualStringTree;
@@ -61,6 +105,8 @@ type
     pnlDetails: TPanel;
     edtMessage: TEdit;
     edtData: TEdit;
+    mCopyMessage: TMenuItem;
+    actMessageCopy: TAction;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -83,18 +129,22 @@ type
       var HintText: string);
     procedure actLogImgCopyExecute(Sender: TObject);
     procedure actLogImgSaveExecute(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure mCopyMessageClick(Sender: TObject);
   private
     { Private declarations }
     FServer: TDNLogServer;
-    procedure _OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
+    FLogUpdateThread: TLogUpdateThread;
+    procedure OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
     procedure LogRowToString(AData: PLogNode; StringBuilder: TStringBuilder; const ASeparator: String; const AAddNewLine: Boolean; const AGetHeader: Boolean = False);
     procedure ExportCSV(StringBuilder: TStringBuilder);
     procedure FilterLog(Priority, Client, TypeNr, Filter: string);
-    function _FilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
+    function  OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
     function  BytesToStr(Bytes: TBytes): string;
     function  GetLogBitmap: TBitmap;
     function  BitmapToPng(ABitmap: TBitmap): TPNGImage;
+    procedure OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
   public
     { Public declarations }
     procedure StartFilter;
@@ -130,11 +180,16 @@ const
   SAVE_FILE_PREFIX = 'DNetLog_';
   SAVE_FILE_DATE = 'yyyymmdd_hhnnss';
 
+  REFRESH_LIST_LOGS_COUNT = 5000;
+
 {$R *.dfm}
 
 procedure TfrmMain.actLogClearExecute(Sender: TObject);
 begin
+  FLogUpdateThread.Logs.Clear;
   vList.Clear;
+  edtMessage.Text := '';
+  edtData.Text    := '';
 end;
 
 procedure TfrmMain.actLogCopyExecute(Sender: TObject);
@@ -343,7 +398,7 @@ begin
   vList.BeginUpdate;
   try
   for Node in vList.Nodes do
-    _FilterLog(Node, Priority, Client, TypeNr, Filter);
+    OnFilterLog(Node, Priority, Client, TypeNr, Filter);
   finally
     vList.EndUpdate;
   end;
@@ -351,16 +406,38 @@ end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
+  FLogUpdateThread := TLogUpdateThread.Create(True);
+  FLogUpdateThread.FreeOnTerminate := True;
+  FLogUpdateThread.OnProcessLogs := OnLogsProcess;
+  FLogUpdateThread.Start;
+
   vList.RootNodecount := 0;
   vList.NodeDatasize  := SizeOf(TLogNode);
-
-  FServer := TDNLogServer.Create;
-  FServer.OnLogReceived := _OnLogReceived;
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
-  FServer.Free;
+  if Assigned(FServer) then
+    FreeAndNil(FServer);
+  FLogUpdateThread.Terminate;
+end;
+
+procedure TfrmMain.FormShow(Sender: TObject);
+begin
+  try
+    FServer := TDNLogServer.Create;
+    FServer.OnLogReceived := OnLogReceived;
+  except
+    on e: EIdCouldNotBindSocket do
+    begin
+      MessageDlg(Format('Can''t bind to the port %d.%sAnother log server instance is running?', [SERVER_PORT, sLineBreak]), mtError, [mbOK], 0);
+      Close;
+    end;
+    on e: Exception do
+    begin
+      raise;
+    end;
+  end;
 end;
 
 function TfrmMain.GetLogBitmap: TBitmap;
@@ -412,16 +489,31 @@ begin
     StringBuilder.AppendLine;
 end;
 
+procedure TfrmMain.mCopyMessageClick(Sender: TObject);
+begin
+  var Node := vList.FocusedNode;
+  if not Assigned(Node) then
+  begin
+    Clipboard.AsText := '';
+    Exit;
+  end;
+
+  var Data: PLogNode := vList.GetNodeData(Node);
+  Clipboard.AsText := Data.LogMessage;
+end;
+
 procedure TfrmMain.pmnuMainPopup(Sender: TObject);
 begin
   if vList.SelectedCount > 1 then
   begin
-    actLogCopy.Caption := 'Copy Selected to Clipboard';
-    actLogSave.Caption := 'Save Selected to File';
+    actMessageCopy.Visible := False;
+    actLogCopy.Caption     := 'Copy Selected to Clipboard';
+    actLogSave.Caption     := 'Save Selected to File';
   end else
   begin
-    actLogCopy.Caption := 'Copy Logs to Clipboard';
-    actLogSave.Caption := 'Save Logs to File';
+    actMessageCopy.Visible := True;
+    actLogCopy.Caption     := 'Copy Logs to Clipboard';
+    actLogSave.Caption     := 'Save Logs to File';
   end;
 end;
 
@@ -570,7 +662,7 @@ begin
   end;
 end;
 
-function TfrmMain._FilterLog(Node: PVirtualNode; Priority, Client, TypeNr,
+function TfrmMain.OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr,
   Filter: string): Boolean;
 var
   Data: PLogNode;
@@ -632,55 +724,139 @@ begin
   end;
 end;
 
-procedure TfrmMain._OnLogReceived(Sender: TObject; const ClientIP: string;
+procedure TfrmMain.OnLogReceived(Sender: TObject; const ClientIP: string;
   const LogMessage: TDNLogMessage);
+begin
+  var Queue := FLogUpdateThread.Logs.LockList;
+  Queue.Add(TCLientLogMessage.Create(ClientIP, LogMessage));
+  FLogUpdateThread.Logs.UnlockList;
+end;
+
+procedure TfrmMain.OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
 var
   Node, Nod: PVirtualNode;
   Data: PLogNode;
 begin
   vList.BeginUpdate;
   try
-    vList.RootNodeCount := vList.RootNodeCount + 1;
-    Node := vList.GetLast;
-    if Assigned(Node) then
+    for var Idx := Low(Logs) to High(Logs) do
     begin
-      Data := vList.GetNodeData(Node);
-      if Assigned(Data) then
+      if FLogUpdateThread.Terminated then
+        Exit;
+
+      vList.RootNodeCount := vList.RootNodeCount + 1;
+      Node := vList.GetLast;
+      if Assigned(Node) then
       begin
-        Data.LogPriority        := LogMessage.LogPriority;
-        Data.LogTimestamp       := LogMessage.LogTimestamp;
-        Data.LogTimestampString := IntToStr(Data.LogTimestamp);
-        Data.LogClient          := ClientIP;
-        Data.LogTypeNr          := LogMessage.LogTypeNr;
-        Data.LogTypeNrString    := IntToStr(Data.LogTypeNr);
-        Data.LogMessage         := LogMessage.LogMessage;
-        Data.LogMessageLC       := Data.LogMessage.ToLower;
-        SetLength(Data.LogDataRaw, Length(LogMessage.LogData));
-        System.Move(LogMessage.LogData[0], Data.LogDataRaw[0], Length(LogMessage.LogData));
-        Data.LogData            := BytesToStr(Data.LogDataRaw);
+        Data := vList.GetNodeData(Node);
+        if Assigned(Data) then
+        begin
+          Data.LogPriority        := Logs[Idx].DNLogMessage.LogPriority;
+          Data.LogTimestamp       := Logs[Idx].DNLogMessage.LogTimestamp;
+          Data.LogTimestampString := IntToStr(Data.LogTimestamp);
+          Data.LogClient          := Logs[Idx].ClientIP;
+          Data.LogTypeNr          := Logs[Idx].DNLogMessage.LogTypeNr;
+          Data.LogTypeNrString    := IntToStr(Data.LogTypeNr);
+          Data.LogMessage         := Logs[Idx].DNLogMessage.LogMessage;
+          Data.LogMessageLC       := Data.LogMessage.ToLower;
+          SetLength(Data.LogDataRaw, Length(Logs[Idx].DNLogMessage.LogData));
+          System.Move(Logs[Idx].DNLogMessage.LogData[0], Data.LogDataRaw[0], Length(Logs[Idx].DNLogMessage.LogData));
+          Data.LogData            := BytesToStr(Data.LogDataRaw);
+        end else
+          Exit;
       end else
         Exit;
-    end else
-      Exit;
 
-    if cbClient.Items.IndexOf(Data.LogClient) < 0 then
-      cbClient.Items.Append(Data.LogClient);
+      if FLogUpdateThread.Terminated then
+        Exit;
 
-    if cbTypeNr.Items.IndexOf(Data.LogTypeNrString) < 0 then
-      cbTypeNr.Items.Append(Data.LogTypeNrString);
-
-    if not _FilterLog(Node, cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text) then
-      if chkAutoScroll.Checked then
+      if Idx >= High(Logs) then
       begin
-        vList.FocusedNode := Node;
-        for Nod in vList.SelectedNodes do
-          vList.Selected[Nod] := False;
-        vList.Selected[Node] := True;
-        vList.ScrollIntoView(Node, false);
+        if cbClient.Items.IndexOf(Data.LogClient) < 0 then
+          cbClient.Items.Append(Data.LogClient);
+
+        if cbTypeNr.Items.IndexOf(Data.LogTypeNrString) < 0 then
+          cbTypeNr.Items.Append(Data.LogTypeNrString);
+
+        if not OnFilterLog(Node, cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text) then
+          if chkAutoScroll.Checked then
+          begin
+            vList.FocusedNode := Node;
+            for Nod in vList.SelectedNodes do
+              vList.Selected[Nod] := False;
+            vList.Selected[Node] := True;
+            vList.ScrollIntoView(Node, false);
+          end;
+
+        Application.ProcessMessages;
       end;
+
+    end;
   finally
     vList.EndUpdate;
   end;
+end;
+
+{ TLogUpdateThread }
+
+procedure TLogUpdateThread.Execute;
+begin
+  inherited;
+  FLogs := TThreadList<TCLientLogMessage>.Create;
+  try
+
+    while not Terminated do
+    begin
+      var Queue := FLogs.LockList;
+      if Queue.Count > 0 then
+      begin
+        if Assigned(FOnProcessLogs) then
+        begin
+          var LogsCount := Min(REFRESH_LIST_LOGS_COUNT, Queue.Count);
+          var Logs: TArray<TCLientLogMessage>;
+          SetLength(Logs, LogsCount);
+          for var i := 0 to LogsCount - 1 do
+            Logs[i] := Queue[i];
+          Queue.DeleteRange(0, LogsCount);
+          FLogs.UnlockList;
+
+          if not Terminated then
+            TThread.Synchronize(nil, procedure
+            begin
+              FOnProcessLogs(Logs);
+            end);
+
+          SetLength(Logs, 0);
+
+        end else
+        begin
+          Queue.Clear;
+          FLogs.UnlockList;
+        end;
+      end else
+        FLogs.UnlockList;
+    end;
+
+  finally
+    FLogs.Free;
+  end;
+end;
+
+function TLogUpdateThread.Min(Value1, Value2: Integer): Integer;
+begin
+  if Value1 < Value2 then
+    Result := Value1
+  else
+    Result := Value2;
+end;
+
+{ TCLientLogMessage }
+
+constructor TCLientLogMessage.Create(const ClientIP: string;
+  const DNLogMessage: TDNLogMessage);
+begin
+  Self.ClientIP := ClientIP;
+  Self.DNLogMessage := DNLogMessage;
 end;
 
 end.

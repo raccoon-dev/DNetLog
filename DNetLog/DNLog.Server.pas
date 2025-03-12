@@ -160,10 +160,7 @@ begin
     if Length(FBuffer) > 0 then
       while DecodeLogMsg(FBuffer, DNLogMessage) do
         if Assigned(FOnLogReceived) then
-          TThread.Synchronize(TThread.Current, procedure
-          begin
-            FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
-          end);
+          FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
   except
     // null
   end;
