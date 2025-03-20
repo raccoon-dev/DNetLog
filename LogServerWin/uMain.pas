@@ -154,32 +154,8 @@ var
 
 implementation
 
-const
-  COL_PRIORITY  = 0;
-  COL_TIMESTAMP = 1;
-  COL_CLIENT    = 2;
-  COL_TYPENR    = 3;
-  COL_MESSAGE   = 4;
-  COL_DATA      = 5;
-
-  IMG_EMPTY     = -1;
-  IMG_DEBUG     = 0;
-  IMG_INFO      = 1;
-  IMG_WARNING   = 2;
-  IMG_ERROR     = 3;
-  IMG_EXCEPTION = 4;
-
-  FILE_CSV = 1;
-  FILE_PNG = 1;
-  FILE_BMP = 2;
-
-  SBAR_SEL_COUNT = 0;
-  SBAR_SEL_TIME = 1;
-
-  SAVE_FILE_PREFIX = 'DNetLog_';
-  SAVE_FILE_DATE = 'yyyymmdd_hhnnss';
-
-  REFRESH_LIST_LOGS_COUNT = 8000;
+uses
+  uConstants;
 
 {$R *.dfm}
 
@@ -252,9 +228,10 @@ var
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
   if dlgSaveImg.FilterIndex = FILE_PNG then
-    dlgSaveImg.FileName := FName + '.png' else
+    dlgSaveImg.FileName := FName + EXT_PNG
+  else
   if dlgSaveImg.FilterIndex = FILE_BMP then
-    dlgSaveImg.FileName := FName + '.bmp';
+    dlgSaveImg.FileName := FName + EXT_BMP;
 
   if dlgSaveImg.Execute then
   begin
@@ -264,8 +241,8 @@ begin
       try
         if dlgSaveImg.FilterIndex = FILE_PNG then
         begin
-          if not TPath.GetExtension(FName).ToLower.Equals('.png') then
-            FName := FName + '.png';
+          if not TPath.GetExtension(FName).ToLower.Equals(EXT_PNG) then
+            FName := FName + EXT_PNG;
 
           png := BitmapToPng(bmp);
           if Assigned(png) then
@@ -277,8 +254,8 @@ begin
         end else
         if dlgSaveImg.FilterIndex = FILE_BMP then
         begin
-          if not TPath.GetExtension(FName).ToLower.Equals('.bmp') then
-            FName := FName + '.bmp';
+          if not TPath.GetExtension(FName).ToLower.Equals(EXT_BMP) then
+            FName := FName + EXT_BMP;
           bmp.SaveToFile(FName);
         end;
       finally
@@ -295,17 +272,17 @@ var
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
   if dlgSave.FilterIndex = FILE_CSV then
-    dlgSave.FileName := FName + '.csv'
+    dlgSave.FileName := FName + EXT_CSV
   else
-    dlgSave.FileName := FName + '.txt'; // We don't support anythig except csv, but maybe someday...
+    dlgSave.FileName := FName + EXT_TXT; // We don't support anythig except csv, but maybe someday...
 
   if dlgSave.Execute then
   begin
     FName := dlgSave.FileName;
     if dlgSave.FilterIndex = FILE_CSV then
     begin
-      if not TPath.GetExtension(FName).ToLower.Equals('.csv') then
-        FName := FName + '.csv';
+      if not TPath.GetExtension(FName).ToLower.Equals(EXT_CSV) then
+        FName := FName + EXT_CSV;
 
       sb := TStringBuilder.Create;
       sl := TStringList.Create;

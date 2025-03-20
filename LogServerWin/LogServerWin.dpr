@@ -6,7 +6,8 @@ uses
   DNLog.Types in '..\DNetLog\DNLog.Types.pas',
   DNLog.Server in '..\DNetLog\DNLog.Server.pas',
   Vcl.Themes,
-  Vcl.Styles;
+  Vcl.Styles,
+  uConstants in 'uConstants.pas';
 
 {$R *.res}
 

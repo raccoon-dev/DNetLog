@@ -236,7 +236,7 @@ object frmMain: TfrmMain
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
         Position = 3
         Text = 'Type Nr'
-        Width = 64
+        Width = 77
       end
       item
         CaptionAlignment = taCenter
