@@ -18,7 +18,6 @@ uses
   Vcl.Forms,
   Vcl.Dialogs,
   Vcl.ExtCtrls,
-  Vcl.ImgList,
   Vcl.StdCtrls,
   Vcl.Menus,
   Vcl.Buttons,
@@ -27,11 +26,11 @@ uses
   Vcl.ExtDlgs,
   Vcl.ComCtrls,
   Vcl.Imaging.pngimage,
+  Vcl.BaseImageCollection,
+  Vcl.ImageCollection,
+  Vcl.VirtualImageList,
+  Vcl.ImgList,
   VirtualTrees,
-  IdBaseComponent,
-  IdComponent,
-  IdCustomTCPServer,
-  IdSocksServer,
   IdException,
   DNLog.Types,
   DNLog.Server;
@@ -73,7 +72,6 @@ type
   TfrmMain = class(TForm)
     pnlFilters: TPanel;
     vList: TVirtualStringTree;
-    ilType: TImageList;
     chkAutoScroll: TCheckBox;
     lblPriority: TLabel;
     lblClient: TLabel;
@@ -101,12 +99,13 @@ type
     actLogImgCopy: TAction;
     actLogImgSave: TAction;
     dlgSaveImg: TSavePictureDialog;
-    IdSocksServer1: TIdSocksServer;
     pnlDetails: TPanel;
     edtMessage: TEdit;
     edtData: TEdit;
     mCopyMessage: TMenuItem;
     actMessageCopy: TAction;
+    vilType: TVirtualImageList;
+    icType: TImageCollection;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -180,7 +179,7 @@ const
   SAVE_FILE_PREFIX = 'DNetLog_';
   SAVE_FILE_DATE = 'yyyymmdd_hhnnss';
 
-  REFRESH_LIST_LOGS_COUNT = 5000;
+  REFRESH_LIST_LOGS_COUNT = 8000;
 
 {$R *.dfm}
 
@@ -586,15 +585,7 @@ var
 begin
   d := Sender.GetNodeData(Node);
   if Assigned(d) then
-  begin
-    d.LogTimestampString := string.Empty;
-    d.LogClient          := string.Empty;
-    d.LogTypeNrString    := string.Empty;
-    d.LogMessage         := string.Empty;
-    d.LogMessageLC       := string.Empty;
-    d.LogData            := string.Empty;
-    SetLength(d.LogDataRaw, 0);
-  end;
+    Finalize(d^);
 end;
 
 procedure TfrmMain.vListGetHint(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -787,8 +778,6 @@ begin
             vList.Selected[Node] := True;
             vList.ScrollIntoView(Node, false);
           end;
-
-        Application.ProcessMessages;
       end;
 
     end;

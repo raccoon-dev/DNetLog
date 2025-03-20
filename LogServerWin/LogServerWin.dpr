@@ -11,6 +11,7 @@ uses
 {$R *.res}
 
 begin
+  ReportMemoryLeaksOnShutdown := {$IFDEF DEBUG}True{$ELSE}False{$ENDIF};
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   Application.Title := 'DNetLog Server';

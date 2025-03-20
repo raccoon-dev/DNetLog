@@ -38,7 +38,6 @@ _Log.i(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
 // Warning messages
 _Log.w(LogMessage: string);
 _Log.w(LogMessage: string; Args: array of const);
-_Log.w(LogMessage: string; Args: array of const);
 _Log.w(LogMessage: string; LogData: TBytes);
 _Log.w(LogTypeNr: ShortInt; LogMessage: string);
 _Log.w(LogTypeNr: ShortInt; LogMessage: string; LogData: TBytes);
