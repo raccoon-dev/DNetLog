@@ -23,6 +23,8 @@ const
 
 type TThreadTest = class(TThread)
   protected
+    function GetMaxLengthString: string;
+    function GetLongUTF8String: string;
     procedure Execute; override;
 end;
 
@@ -34,11 +36,9 @@ type
     procedure tmrTestTimer(Sender: TObject);
     procedure btnTestClick(Sender: TObject);
   private
-    { Private declarations }
     thrTest: TThreadTest;
     procedure OnTerminateThread(Sender: TObject);
   public
-    { Public declarations }
   end;
 
 var
@@ -107,6 +107,9 @@ begin
   for var i := Low(Data) to High(Data) do
     Data[i] := i + 1;
 
+  _Log.d(2, GetMaxLengthString);
+  _Log.d(2, GetLongUTF8String);
+
   while not Terminated do
   begin
     if (Ctr mod 5) = 1 then
@@ -135,6 +138,24 @@ begin
 
   SetLength(Data, 0);
   SetReturnValue(Ctr - 1);
+end;
+
+function TThreadTest.GetLongUTF8String: string;
+begin
+  Result := 'zażółć gęślą jaźń; ';
+  repeat
+    Result := Result + Result;
+  until Length(Result) >= 65535;
+  Result := Result.Remove(65535, Length(Result));
+end;
+
+function TThreadTest.GetMaxLengthString: string;
+begin
+  Result := '1234567890';
+  repeat
+    Result := Result + Result;
+  until Length(Result) >= 65535;
+  Result := Result.Remove(65535, Length(Result));
 end;
 
 end.

@@ -34,6 +34,7 @@ implementation
 
 const
   DEFAULT_UDP_BUFFER_LENGTH = 20*1024*1024; // 20 [MB]
+  MIN_PACKET_LENGTH = 10;
 
 { TDNLogServer }
 
@@ -68,11 +69,10 @@ end;
 
 function TDNLogServer.DecodeLogMsg(var ABytes: TIdBytes; var AMessage: TDNLogMessage): boolean;
 var
-  Msg: TBytes;
   TextLen, DataLen: Word;
 begin
   Result := False;
-  if Length(ABytes) < 10 then
+  if Length(ABytes) < MIN_PACKET_LENGTH then
     Exit;
 
   AMessage.LogPriority := TDNLogPriority(ABytes[0]);
@@ -84,25 +84,21 @@ begin
 
   // Message text
   TextLen := (ABytes[6] shl 8) + ABytes[7];
-  if TextLen > Length(ABytes) - 10 then
+  if TextLen > Length(ABytes) - MIN_PACKET_LENGTH then
     Exit;
   if TextLen > 0 then
-  begin
-    SetLength(Msg, TextLen);
-    System.Move(ABytes[8], Msg[0], TextLen);
-    AMessage.LogMessage := TEncoding.UTF8.GetString(Msg);
-  end else
-    AMessage.LogMessage := string.Empty; // Not really necessary
-  SetLength(Msg, 0);
+    AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), 8, TextLen)
+  else
+    AMessage.LogMessage := string.Empty;
 
   // Message data
   DataLen := (ABytes[8 + TextLen] shl 8) + ABytes[9 + TextLen];
-  if DataLen > Length(ABytes) - 10 then
+  if DataLen > Length(ABytes) - TextLen - MIN_PACKET_LENGTH then
     Exit;
   if DataLen > 0 then
   begin
     SetLength(AMessage.LogData, DataLen);
-    System.Move(ABytes[10 + TextLen], AMessage.LogData[0], DataLen);
+    System.Move(ABytes[MIN_PACKET_LENGTH + TextLen], AMessage.LogData[0], DataLen);
   end else
     SetLength(AMessage.LogData, 0); // Not really necessary
   TrimLeft(TBytes(ABytes),
@@ -141,13 +137,12 @@ end;
 
 procedure TDNLogServer.TrimLeft(var AData: TBytes; ALength: Integer);
 var
-  b: TBytes;
+  Result: TBytes;
 begin
-  SetLength(b, Length(AData) - ALength);
-  System.Move(AData[ALength], b[0], Length(b));
-  SetLength(AData, Length(b));
-  System.Move(b[0], AData[0], Length(b));
-  SetLength(b, 0);
+  SetLength(Result, Length(AData) - ALength);
+  System.Move(AData[ALength], Result[0], Length(Result));
+  SetLength(AData, 0);
+  AData := Result;
 end;
 
 procedure TDNLogServer._OnExecute(AContext: TIdContext);
@@ -157,10 +152,9 @@ begin
   try
     AContext.Connection.Socket.ReadTimeout := 100;
     AContext.Connection.Socket.ReadBytes(FBuffer, -1, True);
-    if Length(FBuffer) > 0 then
-      while DecodeLogMsg(FBuffer, DNLogMessage) do
-        if Assigned(FOnLogReceived) then
-          FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
+    while DecodeLogMsg(FBuffer, DNLogMessage) do
+      if Assigned(FOnLogReceived) then
+        FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
   except
     // null
   end;

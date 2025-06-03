@@ -171,6 +171,7 @@ object frmMain: TfrmMain
     Colors.UnfocusedColor = clWhite
     Colors.UnfocusedSelectionColor = 5195575
     Colors.UnfocusedSelectionBorderColor = 5195575
+    DefaultNodeHeight = 17
     DrawSelectionMode = smBlendedRectangle
     Header.AutoSizeIndex = 3
     Header.Height = 32
@@ -236,7 +237,7 @@ object frmMain: TfrmMain
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
         Position = 3
         Text = 'Type Nr'
-        Width = 77
+        Width = 64
       end
       item
         CaptionAlignment = taCenter
