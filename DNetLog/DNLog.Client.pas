@@ -19,7 +19,10 @@ type TDNLogClient = class(TObject)
   private
     FDNLogSender: IDNLogSender;
   protected
-    procedure LogRaw(const Priority: TDNLogPriority; const LogTypeNr: ShortInt; const LogMessage: string; const LogData: TBytes);
+    function TruncateUTF8(const UTF8Text: TBytes; const MaxDataLength: Integer): TBytes;
+    function ShrinkMessage(const LogMessage: string): TBytes;
+    function ShrinkRawData(const LogData: TBytes): TBytes;
+    procedure LogRaw(const Priority: TDNLogPriority; const LogTypeNr: ShortInt; const LogMessage: TBytes; const LogData: TBytes);
   public
     constructor Create(DNLogSender: IDNLogSender);
     class destructor Destroy;
@@ -66,6 +69,9 @@ function _Log: TDNLogClient; inline;
 
 implementation
 
+const
+  MAX_DATA_LENGTH = 65535;
+
 function _Log: TDNLogClient;
 begin
   Result := TDNLogClient.Instance;
@@ -94,7 +100,7 @@ end;
 procedure TDNLogClient.e(const LogMessage: string; const Args: array of const);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prError, 0, Format(LogMessage, Args), nil);
+  LogRaw(TDNLogPriority.prError, 0, ShrinkMessage(Format(LogMessage, Args)), nil);
 {$ENDIF}
 end;
 
@@ -129,21 +135,21 @@ end;
 procedure TDNLogClient.i(const LogMessage: string; const Args: array of const);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prInfo, 0, Format(LogMessage, Args), nil);
+  LogRaw(TDNLogPriority.prInfo, 0, ShrinkMessage(Format(LogMessage, Args)), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.d(const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prDebug, 0, LogMessage, nil);
+  LogRaw(TDNLogPriority.prDebug, 0, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.d(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prDebug, LogTypeNr, LogMessage, nil);
+  LogRaw(TDNLogPriority.prDebug, LogTypeNr, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
@@ -151,21 +157,21 @@ procedure TDNLogClient.d(const LogTypeNr: ShortInt; const LogMessage: string;
   const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prDebug, LogTypeNr, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prDebug, LogTypeNr, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
 procedure TDNLogClient.d(const LogMessage: string; const Args: array of const);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prDebug, 0, Format(LogMessage, Args), nil);
+  LogRaw(TDNLogPriority.prDebug, 0, ShrinkMessage(Format(LogMessage, Args)), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.d(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prDebug, 0, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prDebug, 0, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
@@ -173,7 +179,7 @@ procedure TDNLogClient.e(const LogTypeNr: ShortInt; const LogMessage: string;
   const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prError, LogTypeNr, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
@@ -186,35 +192,35 @@ end;
 procedure TDNLogClient.e(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prError, 0, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prError, 0, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
 procedure TDNLogClient.e(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prError, LogTypeNr, LogMessage, nil);
+  LogRaw(TDNLogPriority.prError, LogTypeNr, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.e(const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prError, 0, LogMessage, nil);
+  LogRaw(TDNLogPriority.prError, 0, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.i(const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prInfo, 0, LogMessage, nil);
+  LogRaw(TDNLogPriority.prInfo, 0, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.i(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prInfo, LogTypeNr, LogMessage, nil);
+  LogRaw(TDNLogPriority.prInfo, LogTypeNr, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
@@ -222,24 +228,23 @@ procedure TDNLogClient.i(const LogTypeNr: ShortInt; const LogMessage: string;
   const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prInfo, LogTypeNr, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prInfo, LogTypeNr, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
 procedure TDNLogClient.i(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prInfo, 0, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prInfo, 0, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
 procedure TDNLogClient.LogRaw(const Priority: TDNLogPriority; const LogTypeNr: ShortInt;
-  const LogMessage: string; const LogData: TBytes);
+  const LogMessage: TBytes; const LogData: TBytes);
 {$IFDEF USE_DNLOGS}
 var
   sendBuffer: TIdBytes;
   dt: Cardinal;
-  logMessageUTF8: TBytes;
 {$ENDIF}
 begin
 {$IFDEF USE_DNLOGS}
@@ -247,14 +252,13 @@ begin
     Exit;
 
   dt := TThread.GetTickCount;
-  logMessageUTF8 := TEncoding.UTF8.GetBytes(LogMessage);
   SetLength(sendBuffer,
             1 {Priority} +
             4 {timestamp} +
             1 {TypeNr} +
             2 {Message Length} +
             2 {Data Length} +
-            Length(logMessageUTF8) +
+            Length(LogMessage) +
             Length(LogData));
 
   sendBuffer[0] := Ord(Priority);   {Priority}
@@ -263,19 +267,19 @@ begin
   sendBuffer[3] := Byte(dt shr 8);  {timestamp}
   sendBuffer[4] := Byte(dt);        {timestamp}
   sendBuffer[5] := LogTypeNr;       {TypeNr}
-  sendBuffer[6] := Byte(Length(logMessageUTF8) shr 8); {Message Length}
-  sendBuffer[7] := Byte(Length(logMessageUTF8));       {Message Length}
+  sendBuffer[6] := Byte(Length(LogMessage) shr 8); {Message Length}
+  sendBuffer[7] := Byte(Length(LogMessage));       {Message Length}
 
   {Message}
-  if Length(logMessageUTF8) > 0 then
-    System.Move(logMessageUTF8[0], sendBuffer[8], Length(logMessageUTF8));
+  if Length(LogMessage) > 0 then
+    System.Move(LogMessage[0], sendBuffer[8], Length(LogMessage));
 
-  sendBuffer[8 + Length(logMessageUTF8)] := Byte(Length(LogData) shr 8); {Data Length}
-  sendBuffer[9 + Length(logMessageUTF8)] := Byte(Length(LogData));       {Data Length}
+  sendBuffer[8 + Length(LogMessage)] := Byte(Length(LogData) shr 8); {Data Length}
+  sendBuffer[9 + Length(LogMessage)] := Byte(Length(LogData));       {Data Length}
 
   {Data}
   if Length(LogData) > 0 then
-    System.Move(LogData[0], sendBuffer[10 + Length(logMessageUTF8)], Length(LogData));
+    System.Move(LogData[0], sendBuffer[10 + Length(LogMessage)], Length(LogData));
 
   FDNLogSender.Write(sendBuffer);
 {$ENDIF}
@@ -288,17 +292,53 @@ begin
   Result := FDNLogClient;
 end;
 
+function TDNLogClient.ShrinkMessage(const LogMessage: string): TBytes;
+begin
+  Result := TEncoding.UTF8.GetBytes(LogMessage);
+  Result := TruncateUTF8(Result, MAX_DATA_LENGTH);
+end;
+
+function TDNLogClient.ShrinkRawData(const LogData: TBytes): TBytes;
+begin
+  Result := LogData;
+  if Length(Result) > MAX_DATA_LENGTH then
+    SetLength(Result, MAX_DATA_LENGTH);
+end;
+
+function TDNLogClient.TruncateUTF8(const UTF8Text: TBytes;
+  const MaxDataLength: Integer): TBytes;
+begin
+  Result := UTF8Text;
+
+  var Counter := 0;
+  if Length(Result) > MaxDataLength then
+    for var i := MaxDataLength downto 0 do
+    begin
+      if (Result[i] and $C0) <> $80 then
+      begin
+        SetLength(Result, i);
+        Break;
+      end;
+      Inc(Counter);
+      if Counter > 3 then
+      begin
+        Result := TEncoding.UTF8.GetBytes('[DNLOG ERROR: Incorrect UTF-8 message]');
+        Break;
+      end;
+    end;
+end;
+
 procedure TDNLogClient.x(const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prException, 0, LogMessage, nil);
+  LogRaw(TDNLogPriority.prException, 0, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.x(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prException, LogTypeNr, LogMessage, nil);
+  LogRaw(TDNLogPriority.prException, LogTypeNr, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
@@ -306,7 +346,7 @@ procedure TDNLogClient.x(const LogTypeNr: ShortInt; const LogMessage: string;
   const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prException, LogTypeNr, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prException, LogTypeNr, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
@@ -314,49 +354,49 @@ procedure TDNLogClient.w(const LogTypeNr: ShortInt; const LogMessage: string;
   const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prWarning, LogTypeNr, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
 procedure TDNLogClient.w(const LogMessage: string; const Args: array of const);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prWarning, 0, Format(LogMessage, Args), nil);
+  LogRaw(TDNLogPriority.prWarning, 0, ShrinkMessage(Format(LogMessage, Args)), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.x(const LogMessage: string; const Args: array of const);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prException, 0, Format(LogMessage, Args), nil);
+  LogRaw(TDNLogPriority.prException, 0, ShrinkMessage(Format(LogMessage, Args)), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.x(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prException, 0, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prException, 0, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 
 procedure TDNLogClient.w(const LogTypeNr: ShortInt; const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prWarning, LogTypeNr, LogMessage, nil);
+  LogRaw(TDNLogPriority.prWarning, LogTypeNr, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.w(const LogMessage: string);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prWarning, 0, LogMessage, nil);
+  LogRaw(TDNLogPriority.prWarning, 0, ShrinkMessage(LogMessage), nil);
 {$ENDIF}
 end;
 
 procedure TDNLogClient.w(const LogMessage: string; const LogData: TBytes);
 begin
 {$IFDEF USE_DNLOGS}
-  LogRaw(TDNLogPriority.prWarning, 0, LogMessage, LogData);
+  LogRaw(TDNLogPriority.prWarning, 0, ShrinkMessage(LogMessage), ShrinkRawData(LogData));
 {$ENDIF}
 end;
 

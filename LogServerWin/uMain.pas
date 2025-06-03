@@ -31,6 +31,10 @@ uses
   Vcl.VirtualImageList,
   Vcl.ImgList,
   VirtualTrees,
+  VirtualTrees.Types,
+  VirtualTrees.BaseAncestorVCL,
+  VirtualTrees.BaseTree,
+  VirtualTrees.AncestorVCL,
   IdException,
   DNLog.Types,
   DNLog.Server;
@@ -156,6 +160,9 @@ implementation
 
 uses
   uConstants;
+
+const
+  MAX_EDIT_TEXT_LENGTH = 32767;
 
 {$R *.dfm}
 
@@ -545,8 +552,8 @@ begin
       d := Sender.GetNodeData(Node);
       if Assigned(d) then
       begin
-        edtMessage.Text := d.LogMessage;
-        edtData.Text    := d.LogData;
+        edtMessage.Text := d.LogMessage.Substring(0, MAX_EDIT_TEXT_LENGTH);
+        edtData.Text    := d.LogData.Substring(0, MAX_EDIT_TEXT_LENGTH);
       end;
     end else
     begin
