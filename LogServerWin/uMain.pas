@@ -734,51 +734,87 @@ end;
 
 procedure TfrmMain.OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
 var
-  Node, Nod: PVirtualNode;
+  Node, Nod, LastNode, LastOldNode: PVirtualNode;
   Data: PLogNode;
+  PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter: string;
+  ClientSet, TypeNrSet: TDictionary<string, Boolean>;
 begin
-  vList.BeginUpdate;
+  if Length(Logs) = 0 then
+    Exit;
+
+  // Cache filter values
+  PriorityFilter := cbPriority.Text;
+  ClientFilter := cbClient.Text;
+  TypeNrFilter := cbTypeNr.Text;
+  MessageFilter := edtFilter.Text;
+
+  // Build sets of existing clients/types for O(1) lookup
+  ClientSet := TDictionary<string, Boolean>.Create;
+  TypeNrSet := TDictionary<string, Boolean>.Create;
   try
-    for var Idx := Low(Logs) to High(Logs) do
-    begin
-      if FLogUpdateThread.Terminated then
-        Exit;
+    for var i := 0 to cbClient.Items.Count - 1 do
+      ClientSet.AddOrSetValue(cbClient.Items[i], True);
+    for var i := 0 to cbTypeNr.Items.Count - 1 do
+      TypeNrSet.AddOrSetValue(cbTypeNr.Items[i], True);
 
-      vList.RootNodeCount := vList.RootNodeCount + 1;
-      Node := vList.GetLast;
-      if Assigned(Node) then
-        Data := FillNode(Node, Logs[Idx])
+    vList.BeginUpdate;
+    try
+      // Remember last node before adding new ones (O(1) way to find first new node)
+      LastOldNode := vList.GetLast;
+
+      // Add all nodes at once
+      vList.RootNodeCount := vList.RootNodeCount + Cardinal(Length(Logs));
+
+      // Get first new node in O(1)
+      if Assigned(LastOldNode) then
+        Node := vList.GetNextSibling(LastOldNode)
       else
-        Exit;
+        Node := vList.GetFirst;
 
-      if FLogUpdateThread.Terminated then
-        Exit;
-
-      if not Assigned(Data) then
-        Continue;
-
-      OnFilterLog(Node, cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text);
-      if cbClient.Items.IndexOf(Data.LogClient) < 0 then
-        cbClient.Items.Append(Data.LogClient);
-
-      if cbTypeNr.Items.IndexOf(Data.LogTypeNrString) < 0 then
-        cbTypeNr.Items.Append(Data.LogTypeNrString);
-
-      if Idx >= High(Logs) then
+      LastNode := nil;
+      for var Idx := Low(Logs) to High(Logs) do
       begin
-        if chkAutoScroll.Checked then
+        if FLogUpdateThread.Terminated or not Assigned(Node) then
+          Exit;
+
+        Data := FillNode(Node, Logs[Idx]);
+        if Assigned(Data) then
         begin
-          vList.FocusedNode := Node;
-          for Nod in vList.SelectedNodes do
-            vList.Selected[Nod] := False;
-          vList.Selected[Node] := True;
-          vList.ScrollIntoView(Node, false);
+          OnFilterLog(Node, PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter);
+
+          if not ClientSet.ContainsKey(Data.LogClient) then
+          begin
+            ClientSet.Add(Data.LogClient, True);
+            cbClient.Items.Append(Data.LogClient);
+          end;
+
+          if not TypeNrSet.ContainsKey(Data.LogTypeNrString) then
+          begin
+            TypeNrSet.Add(Data.LogTypeNrString, True);
+            cbTypeNr.Items.Append(Data.LogTypeNrString);
+          end;
         end;
+
+        LastNode := Node;
+        Node := vList.GetNextSibling(Node);
       end;
 
+      // Auto-scroll only once at the end
+      if chkAutoScroll.Checked and Assigned(LastNode) then
+      begin
+        vList.FocusedNode := LastNode;
+        for Nod in vList.SelectedNodes do
+          vList.Selected[Nod] := False;
+        vList.Selected[LastNode] := True;
+        vList.ScrollIntoView(LastNode, False);
+      end;
+
+    finally
+      vList.EndUpdate;
     end;
   finally
-    vList.EndUpdate;
+    ClientSet.Free;
+    TypeNrSet.Free;
   end;
 end;
 

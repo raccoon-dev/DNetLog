@@ -31,7 +31,7 @@ const
   SAVE_FILE_PREFIX = 'DNetLog_';
   SAVE_FILE_DATE   = 'yyyymmdd_hhnnss';
 
-  REFRESH_LIST_LOGS_COUNT = 8000;
+  REFRESH_LIST_LOGS_COUNT = 50000;
 
 implementation
 
