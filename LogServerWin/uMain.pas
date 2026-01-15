@@ -68,6 +68,8 @@ type
     FOnProcessLogs: TOnProcessLogs;
     function Min(Value1, Value2: Integer): Integer; inline;
   public
+    constructor Create(CreateSuspended: Boolean);
+    destructor Destroy; override;
     procedure Execute; override;
     property Logs: TThreadList<TCLientLogMessage> read FLogs;
     property OnProcessLogs: TOnProcessLogs read FOnProcessLogs write FOnProcessLogs;
@@ -424,7 +426,7 @@ end;
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FLogUpdateThread := TLogUpdateThread.Create(True);
-  FLogUpdateThread.FreeOnTerminate := True;
+  FLogUpdateThread.FreeOnTerminate := False;
   FLogUpdateThread.OnProcessLogs := OnLogsProcess;
   FLogUpdateThread.Start;
 
@@ -437,6 +439,8 @@ begin
   if Assigned(FServer) then
     FreeAndNil(FServer);
   FLogUpdateThread.Terminate;
+  FLogUpdateThread.WaitFor;
+  FreeAndNil(FLogUpdateThread);
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
@@ -780,46 +784,55 @@ end;
 
 { TLogUpdateThread }
 
+constructor TLogUpdateThread.Create(CreateSuspended: Boolean);
+begin
+  inherited Create(CreateSuspended);
+  FLogs := TThreadList<TCLientLogMessage>.Create;
+end;
+
+destructor TLogUpdateThread.Destroy;
+begin
+  FLogs.Free;
+  inherited;
+end;
+
 procedure TLogUpdateThread.Execute;
 begin
   inherited;
-  FLogs := TThreadList<TCLientLogMessage>.Create;
-  try
 
-    while not Terminated do
+  while not Terminated do
+  begin
+    var Queue := FLogs.LockList;
+    if Queue.Count > 0 then
     begin
-      var Queue := FLogs.LockList;
-      if Queue.Count > 0 then
+      if Assigned(FOnProcessLogs) then
       begin
-        if Assigned(FOnProcessLogs) then
-        begin
-          var LogsCount := Min(REFRESH_LIST_LOGS_COUNT, Queue.Count);
-          var Logs: TArray<TCLientLogMessage>;
-          SetLength(Logs, LogsCount);
-          for var i := 0 to LogsCount - 1 do
-            Logs[i] := Queue[i];
-          Queue.DeleteRange(0, LogsCount);
-          FLogs.UnlockList;
-
-          if not Terminated then
-            TThread.Synchronize(nil, procedure
-            begin
-              FOnProcessLogs(Logs);
-            end);
-
-          SetLength(Logs, 0);
-
-        end else
-        begin
-          Queue.Clear;
-          FLogs.UnlockList;
-        end;
-      end else
+        var LogsCount := Min(REFRESH_LIST_LOGS_COUNT, Queue.Count);
+        var Logs: TArray<TCLientLogMessage>;
+        SetLength(Logs, LogsCount);
+        for var i := 0 to LogsCount - 1 do
+          Logs[i] := Queue[i];
+        Queue.DeleteRange(0, LogsCount);
         FLogs.UnlockList;
-    end;
 
-  finally
-    FLogs.Free;
+        if not Terminated then
+          TThread.Synchronize(nil, procedure
+          begin
+            FOnProcessLogs(Logs);
+          end);
+
+        SetLength(Logs, 0);
+
+      end else
+      begin
+        Queue.Clear;
+        FLogs.UnlockList;
+      end;
+    end else
+    begin
+      FLogs.UnlockList;
+      Sleep(10);
+    end;
   end;
 end;
 
