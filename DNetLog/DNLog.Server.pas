@@ -35,7 +35,11 @@ implementation
 
 const
   DEFAULT_UDP_BUFFER_LENGTH = 20*1024*1024; // 20 [MB]
-  MIN_PACKET_LENGTH = 10;
+  MIN_PACKET_LENGTH = 1 {Priority} +
+                      4 {Timestamp} +
+                      1 {TypeNr} +
+                      2 {Message Length} +
+                      2 {Data Length};
 
 { TDNLogServer }
 
@@ -83,33 +87,42 @@ begin
                           ABytes[4];
   AMessage.LogTypeNr := ABytes[5];
 
-  // Message text
+  // Message text length
   TextLen := (ABytes[6] shl 8) + ABytes[7];
-  if TextLen > Length(ABytes) - MIN_PACKET_LENGTH then
+
+  // Validate we have enough bytes for: header(8) + TextLen + DataLenField(2)
+  if Length(ABytes) < 8 + TextLen + 2 then
     Exit;
+
+  // Message text
   if TextLen > 0 then
-    AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), 8, TextLen)
+  begin
+    try
+      AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), 8, TextLen);
+    except
+      AMessage.LogMessage := '[Invalid UTF-8 data]';
+    end;
+  end
   else
     AMessage.LogMessage := string.Empty;
 
-  // Message data
+  // Message data length
   DataLen := (ABytes[8 + TextLen] shl 8) + ABytes[9 + TextLen];
-  if DataLen > Length(ABytes) - TextLen - MIN_PACKET_LENGTH then
+
+  // Validate we have enough bytes for full packet
+  if Length(ABytes) < MIN_PACKET_LENGTH + TextLen + DataLen then
     Exit;
+
+  // Message data
   if DataLen > 0 then
   begin
     SetLength(AMessage.LogData, DataLen);
     System.Move(ABytes[MIN_PACKET_LENGTH + TextLen], AMessage.LogData[0], DataLen);
-  end else
-    SetLength(AMessage.LogData, 0); // Not really necessary
-  TrimLeft(TBytes(ABytes),
-            1 {Priority} +
-            4 {timestamp} +
-            1 {TypeNr} +
-            2 {Message Length} +
-            2 {Data Length} +
-            TextLen +
-            DataLen);
+  end
+  else
+    SetLength(AMessage.LogData, 0);
+
+  TrimLeft(TBytes(ABytes), MIN_PACKET_LENGTH + TextLen + DataLen);
   Result := True;
 end;
 

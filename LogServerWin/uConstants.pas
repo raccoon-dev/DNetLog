@@ -32,6 +32,7 @@ const
   SAVE_FILE_DATE   = 'yyyymmdd_hhnnss';
 
   REFRESH_LIST_LOGS_COUNT = 50000;
+  MAX_LOG_QUEUE_SIZE = 500000;
 
 implementation
 

@@ -90,7 +90,15 @@ end;
 
 procedure TDNLogSenderTCP.Write(IdBytes: TIdBytes);
 begin
-  FIdTCPClient.Socket.Write(IdBytes, Length(IdBytes));
+  try
+    FIdTCPClient.Socket.Write(IdBytes, Length(IdBytes));
+  except
+    // Connection lost - disconnect so Connected returns false
+    try
+      FIdTCPClient.Disconnect(False);
+    except
+    end;
+  end;
 end;
 
 { TDNLogSenderUDP }
@@ -131,7 +139,11 @@ end;
 
 procedure TDNLogSenderUDP.Write(IdBytes: TIdBytes);
 begin
-  FIdUDPClient.SendBuffer(IdBytes);
+  try
+    FIdUDPClient.SendBuffer(IdBytes);
+  except
+    // UDP send failed - silently ignore
+  end;
 end;
 
 { TDNLogSenderDummy }

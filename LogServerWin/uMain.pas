@@ -66,12 +66,15 @@ type
   private
     FLogs: TThreadList<TCLientLogMessage>;
     FOnProcessLogs: TOnProcessLogs;
+    FDroppedCount: Int64;
     function Min(Value1, Value2: Integer): Integer; inline;
   public
     constructor Create(CreateSuspended: Boolean);
     destructor Destroy; override;
     procedure Execute; override;
+    procedure AddLog(const ClientIP: string; const LogMessage: TDNLogMessage);
     property Logs: TThreadList<TCLientLogMessage> read FLogs;
+    property DroppedCount: Int64 read FDroppedCount;
     property OnProcessLogs: TOnProcessLogs read FOnProcessLogs write FOnProcessLogs;
   end;
 
@@ -140,6 +143,8 @@ type
     { Private declarations }
     FServer: TDNLogServer;
     FLogUpdateThread: TLogUpdateThread;
+    FSelectionTimer: TTimer;
+    procedure SelectionTimerTimer(Sender: TObject);
     function  FillNode(const Node: PVirtualNode; const LogMessage: TCLientLogMessage): PLogNode;
     procedure OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
     procedure LogRowToString(AData: PLogNode; StringBuilder: TStringBuilder; const ASeparator: String; const AAddNewLine: Boolean; const AGetHeader: Boolean = False);
@@ -399,7 +404,7 @@ begin
 
   Result.LogPriority        := LogMessage.DNLogMessage.LogPriority;
   Result.LogTimestamp       := LogMessage.DNLogMessage.LogTimestamp;
-  Result.LogTimestampString := IntToStr(Result.LogTimestamp);
+  Result.LogTimestampString := Format('%d.%.3d', [Result.LogTimestamp div 1000, Result.LogTimestamp mod 1000]);
   Result.LogClient          := LogMessage.ClientIP;
   Result.LogTypeNr          := LogMessage.DNLogMessage.LogTypeNr;
   Result.LogTypeNrString    := IntToStr(Result.LogTypeNr);
@@ -429,6 +434,11 @@ begin
   FLogUpdateThread.FreeOnTerminate := False;
   FLogUpdateThread.OnProcessLogs := OnLogsProcess;
   FLogUpdateThread.Start;
+
+  FSelectionTimer := TTimer.Create(Self);
+  FSelectionTimer.Enabled := False;
+  FSelectionTimer.Interval := 100;
+  FSelectionTimer.OnTimer := SelectionTimerTimer;
 
   vList.RootNodecount := 0;
   vList.NodeDatasize  := SizeOf(TLogNode);
@@ -547,29 +557,22 @@ end;
 procedure TfrmMain.vListAddToSelection(Sender: TBaseVirtualTree;
   Node: PVirtualNode);
 var
-  n: PVirtualNode;
   d: PLogNode;
-  min, max: Cardinal;
 begin
   if Sender.SelectedCount > 1 then
   begin
+    // Multiple selection - update count immediately, defer time calculation
     edtMessage.Text := '';
     edtData.Text    := '';
     sbMain.Panels[SBAR_SEL_COUNT].Text := Format('Selected %d rows', [Sender.SelectedCount]);
-    min := Cardinal.MaxValue;
-    max := Cardinal.MinValue;
-    for n in Sender.SelectedNodes do
-    begin
-      d := Sender.GetNodeData(n);
-      if Assigned(d) then
-        if d.LogTimestamp < min then
-          min := d.LogTimestamp else
-        if d.LogTimestamp > max then
-          max := d.LogTimestamp;
-      sbMain.Panels[SBAR_SEL_TIME].Text := Format('∆ time = %d [ms]', [max - min]);
-    end;
+    sbMain.Panels[SBAR_SEL_TIME].Text := 'Calculating...';
+    // Reset timer to calculate delta time after selection is complete
+    FSelectionTimer.Enabled := False;
+    FSelectionTimer.Enabled := True;
   end else
   begin
+    // Single selection - show details immediately
+    FSelectionTimer.Enabled := False;
     sbMain.Panels[SBAR_SEL_COUNT].Text := string.Empty;
     sbMain.Panels[SBAR_SEL_TIME].Text := string.Empty;
     if Assigned(Node) then
@@ -586,6 +589,33 @@ begin
       edtData.Text    := '';
     end;
   end;
+end;
+
+procedure TfrmMain.SelectionTimerTimer(Sender: TObject);
+var
+  n: PVirtualNode;
+  d: PLogNode;
+  min, max: Cardinal;
+begin
+  FSelectionTimer.Enabled := False;
+
+  if vList.SelectedCount <= 1 then
+    Exit;
+
+  min := Cardinal.MaxValue;
+  max := Cardinal.MinValue;
+  for n in vList.SelectedNodes do
+  begin
+    d := vList.GetNodeData(n);
+    if Assigned(d) then
+    begin
+      if d.LogTimestamp < min then
+        min := d.LogTimestamp;
+      if d.LogTimestamp > max then
+        max := d.LogTimestamp;
+    end;
+  end;
+  sbMain.Panels[SBAR_SEL_TIME].Text := Format('∆ time = %d.%.3d [s]', [(max - min) div 1000, (max - min) mod 1000]);
 end;
 
 procedure TfrmMain.vListFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
@@ -727,9 +757,7 @@ end;
 procedure TfrmMain.OnLogReceived(Sender: TObject; const ClientIP: string;
   const LogMessage: TDNLogMessage);
 begin
-  var Queue := FLogUpdateThread.Logs.LockList;
-  Queue.Add(TCLientLogMessage.Create(ClientIP, LogMessage));
-  FLogUpdateThread.Logs.UnlockList;
+  FLogUpdateThread.AddLog(ClientIP, LogMessage);
 end;
 
 procedure TfrmMain.OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
@@ -738,6 +766,7 @@ var
   Data: PLogNode;
   PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter: string;
   ClientSet, TypeNrSet: TDictionary<string, Boolean>;
+  WasAtBottom: Boolean;
 begin
   if Length(Logs) = 0 then
     Exit;
@@ -757,10 +786,14 @@ begin
     for var i := 0 to cbTypeNr.Items.Count - 1 do
       TypeNrSet.AddOrSetValue(cbTypeNr.Items[i], True);
 
+    // Remember last node before adding new ones (O(1) way to find first new node)
+    LastOldNode := vList.GetLast;
+
+    // Check if user was at bottom (for auto-scroll decision)
+    WasAtBottom := (LastOldNode = nil) or (vList.BottomNode = LastOldNode);
+
     vList.BeginUpdate;
     try
-      // Remember last node before adding new ones (O(1) way to find first new node)
-      LastOldNode := vList.GetLast;
 
       // Add all nodes at once
       vList.RootNodeCount := vList.RootNodeCount + Cardinal(Length(Logs));
@@ -799,8 +832,8 @@ begin
         Node := vList.GetNextSibling(Node);
       end;
 
-      // Auto-scroll only once at the end
-      if chkAutoScroll.Checked and Assigned(LastNode) then
+      // Auto-scroll only if checkbox is checked AND user was at bottom
+      if chkAutoScroll.Checked and WasAtBottom and Assigned(LastNode) then
       begin
         vList.FocusedNode := LastNode;
         for Nod in vList.SelectedNodes do
@@ -824,6 +857,7 @@ constructor TLogUpdateThread.Create(CreateSuspended: Boolean);
 begin
   inherited Create(CreateSuspended);
   FLogs := TThreadList<TCLientLogMessage>.Create;
+  FDroppedCount := 0;
 end;
 
 destructor TLogUpdateThread.Destroy;
@@ -878,6 +912,26 @@ begin
     Result := Value1
   else
     Result := Value2;
+end;
+
+procedure TLogUpdateThread.AddLog(const ClientIP: string; const LogMessage: TDNLogMessage);
+var
+  Queue: TList<TCLientLogMessage>;
+  DropCount: Integer;
+begin
+  Queue := FLogs.LockList;
+  try
+    // Drop oldest logs if queue is full
+    if Queue.Count >= MAX_LOG_QUEUE_SIZE then
+    begin
+      DropCount := Queue.Count - MAX_LOG_QUEUE_SIZE + 1;
+      Queue.DeleteRange(0, DropCount);
+      Inc(FDroppedCount, DropCount);
+    end;
+    Queue.Add(TCLientLogMessage.Create(ClientIP, LogMessage));
+  finally
+    FLogs.UnlockList;
+  end;
 end;
 
 { TCLientLogMessage }
