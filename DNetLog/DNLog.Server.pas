@@ -137,12 +137,18 @@ end;
 
 procedure TDNLogServer.TrimLeft(var AData: TBytes; ALength: Integer);
 var
-  Result: TBytes;
+  NewData: TBytes;
 begin
-  SetLength(Result, Length(AData) - ALength);
-  System.Move(AData[ALength], Result[0], Length(Result));
-  SetLength(AData, 0);
-  AData := Result;
+  if ALength <= 0 then
+    Exit;
+  if ALength >= Length(AData) then
+  begin
+    SetLength(AData, 0);
+    Exit;
+  end;
+  SetLength(NewData, Length(AData) - ALength);
+  System.Move(AData[ALength], NewData[0], Length(NewData));
+  AData := NewData;
 end;
 
 procedure TDNLogServer._OnExecute(AContext: TIdContext);
