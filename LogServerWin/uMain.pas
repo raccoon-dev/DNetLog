@@ -588,7 +588,9 @@ end;
 function TfrmMain.ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
 var
   Parts: TArray<string>;
-  Value: Integer;
+  RangeParts: TArray<string>;
+  Part: string;
+  Value, RangeStart, RangeEnd, j: Integer;
   i: Integer;
 begin
   Result := TList<Integer>.Create;
@@ -599,8 +601,34 @@ begin
   Parts := TypeNrFilter.Split([' ', ',', ';', '.'], TStringSplitOptions.ExcludeEmpty);
 
   for i := 0 to High(Parts) do
-    if TryStrToInt(Parts[i].Trim, Value) then
-      Result.Add(Value);
+  begin
+    Part := Parts[i].Trim;
+
+    // Check if it's a range (contains hyphen)
+    if Part.Contains('-') then
+    begin
+      RangeParts := Part.Split(['-']);
+      if (Length(RangeParts) = 2) and
+         TryStrToInt(RangeParts[0].Trim, RangeStart) and
+         TryStrToInt(RangeParts[1].Trim, RangeEnd) then
+      begin
+        // Add all values in range (inclusive)
+        if RangeStart <= RangeEnd then
+          for j := RangeStart to RangeEnd do
+            Result.Add(j)
+        else
+          // Handle reverse range (e.g., 5-1)
+          for j := RangeStart downto RangeEnd do
+            Result.Add(j);
+      end;
+    end
+    else
+    begin
+      // Single value
+      if TryStrToInt(Part, Value) then
+        Result.Add(Value);
+    end;
+  end;
 end;
 
 procedure TfrmMain.SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
