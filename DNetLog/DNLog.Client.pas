@@ -266,34 +266,27 @@ begin
     Exit;
 
   dt := TThread.GetTickCount;
-  SetLength(sendBuffer,
-            1 {Priority} +
-            4 {timestamp} +
-            1 {TypeNr} +
-            2 {Message Length} +
-            2 {Data Length} +
-            Length(LogMessage) +
-            Length(LogData));
+  SetLength(sendBuffer, PACKET_HEADER_SIZE + Length(LogMessage) + Length(LogData));
 
-  sendBuffer[0] := Ord(Priority);   {Priority}
-  sendBuffer[1] := Byte(dt shr 24); {timestamp}
-  sendBuffer[2] := Byte(dt shr 16); {timestamp}
-  sendBuffer[3] := Byte(dt shr 8);  {timestamp}
-  sendBuffer[4] := Byte(dt);        {timestamp}
-  sendBuffer[5] := LogTypeNr;       {TypeNr}
-  sendBuffer[6] := Byte(Length(LogMessage) shr 8); {Message Length}
-  sendBuffer[7] := Byte(Length(LogMessage));       {Message Length}
+  sendBuffer[PACKET_OFFSET_PRIORITY] := Ord(Priority);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP]     := Byte(dt shr 24);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP + 1] := Byte(dt shr 16);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP + 2] := Byte(dt shr 8);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP + 3] := Byte(dt);
+  sendBuffer[PACKET_OFFSET_TYPENR] := LogTypeNr;
+  sendBuffer[PACKET_OFFSET_MSGLEN]     := Byte(Length(LogMessage) shr 8);
+  sendBuffer[PACKET_OFFSET_MSGLEN + 1] := Byte(Length(LogMessage));
 
   {Message}
   if Length(LogMessage) > 0 then
-    System.Move(LogMessage[0], sendBuffer[8], Length(LogMessage));
+    System.Move(LogMessage[0], sendBuffer[PACKET_OFFSET_MESSAGE], Length(LogMessage));
 
-  sendBuffer[8 + Length(LogMessage)] := Byte(Length(LogData) shr 8); {Data Length}
-  sendBuffer[9 + Length(LogMessage)] := Byte(Length(LogData));       {Data Length}
+  sendBuffer[PACKET_OFFSET_MESSAGE + Length(LogMessage)]     := Byte(Length(LogData) shr 8);
+  sendBuffer[PACKET_OFFSET_MESSAGE + Length(LogMessage) + 1] := Byte(Length(LogData));
 
   {Data}
   if Length(LogData) > 0 then
-    System.Move(LogData[0], sendBuffer[10 + Length(LogMessage)], Length(LogData));
+    System.Move(LogData[0], sendBuffer[PACKET_HEADER_SIZE + Length(LogMessage)], Length(LogData));
 
   FDNLogSender.Write(sendBuffer);
 {$ENDIF}

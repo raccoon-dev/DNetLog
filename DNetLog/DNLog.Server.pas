@@ -35,11 +35,6 @@ implementation
 
 const
   DEFAULT_UDP_BUFFER_LENGTH = 20*1024*1024; // 20 [MB]
-  MIN_PACKET_LENGTH = 1 {Priority} +
-                      4 {Timestamp} +
-                      1 {TypeNr} +
-                      2 {Message Length} +
-                      2 {Data Length};
 
 { TDNLogServer }
 
@@ -77,28 +72,28 @@ var
   TextLen, DataLen: Word;
 begin
   Result := False;
-  if Length(ABytes) < MIN_PACKET_LENGTH then
+  if Length(ABytes) < PACKET_HEADER_SIZE then
     Exit;
 
-  AMessage.LogPriority := TDNLogPriority(ABytes[0]);
-  AMessage.LogTimestamp := (ABytes[1] shl 24) +
-                         (ABytes[2] shl 16) +
-                         (ABytes[3] shl 8) +
-                          ABytes[4];
-  AMessage.LogTypeNr := ABytes[5];
+  AMessage.LogPriority := TDNLogPriority(ABytes[PACKET_OFFSET_PRIORITY]);
+  AMessage.LogTimestamp := (ABytes[PACKET_OFFSET_TIMESTAMP] shl 24) +
+                           (ABytes[PACKET_OFFSET_TIMESTAMP + 1] shl 16) +
+                           (ABytes[PACKET_OFFSET_TIMESTAMP + 2] shl 8) +
+                            ABytes[PACKET_OFFSET_TIMESTAMP + 3];
+  AMessage.LogTypeNr := ABytes[PACKET_OFFSET_TYPENR];
 
   // Message text length
-  TextLen := (ABytes[6] shl 8) + ABytes[7];
+  TextLen := (ABytes[PACKET_OFFSET_MSGLEN] shl 8) + ABytes[PACKET_OFFSET_MSGLEN + 1];
 
-  // Validate we have enough bytes for: header(8) + TextLen + DataLenField(2)
-  if Length(ABytes) < 8 + TextLen + 2 then
+  // Validate we have enough bytes for: header + TextLen + DataLenField(2)
+  if Length(ABytes) < PACKET_OFFSET_MESSAGE + TextLen + PACKET_SIZE_DATALEN then
     Exit;
 
   // Message text
   if TextLen > 0 then
   begin
     try
-      AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), 8, TextLen);
+      AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), PACKET_OFFSET_MESSAGE, TextLen);
     except
       AMessage.LogMessage := '[Invalid UTF-8 data]';
     end;
@@ -107,22 +102,22 @@ begin
     AMessage.LogMessage := string.Empty;
 
   // Message data length
-  DataLen := (ABytes[8 + TextLen] shl 8) + ABytes[9 + TextLen];
+  DataLen := (ABytes[PACKET_OFFSET_MESSAGE + TextLen] shl 8) + ABytes[PACKET_OFFSET_MESSAGE + TextLen + 1];
 
   // Validate we have enough bytes for full packet
-  if Length(ABytes) < MIN_PACKET_LENGTH + TextLen + DataLen then
+  if Length(ABytes) < PACKET_HEADER_SIZE + TextLen + DataLen then
     Exit;
 
   // Message data
   if DataLen > 0 then
   begin
     SetLength(AMessage.LogData, DataLen);
-    System.Move(ABytes[MIN_PACKET_LENGTH + TextLen], AMessage.LogData[0], DataLen);
+    System.Move(ABytes[PACKET_HEADER_SIZE + TextLen], AMessage.LogData[0], DataLen);
   end
   else
     SetLength(AMessage.LogData, 0);
 
-  TrimLeft(TBytes(ABytes), MIN_PACKET_LENGTH + TextLen + DataLen);
+  TrimLeft(TBytes(ABytes), PACKET_HEADER_SIZE + TextLen + DataLen);
   Result := True;
 end;
 

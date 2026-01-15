@@ -151,6 +151,7 @@ type
     procedure ExportCSV(StringBuilder: TStringBuilder);
     procedure FilterLog(Priority, Client, TypeNr, Filter: string);
     function  OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
+    function  ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
     function  BytesToStr(Bytes: TBytes): string;
     function  GetLogBitmap: TBitmap;
@@ -535,6 +536,24 @@ begin
   end;
 end;
 
+function TfrmMain.ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
+var
+  Parts: TArray<string>;
+  Value: Integer;
+  i: Integer;
+begin
+  Result := TList<Integer>.Create;
+  if TypeNrFilter.IsEmpty then
+    Exit;
+
+  // Split by space, comma, semicolon, or dot
+  Parts := TypeNrFilter.Split([' ', ',', ';', '.'], TStringSplitOptions.ExcludeEmpty);
+
+  for i := 0 to High(Parts) do
+    if TryStrToInt(Parts[i].Trim, Value) then
+      Result.Add(Value);
+end;
+
 procedure TfrmMain.SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
 begin
   vList.IsFiltered[Node] := not SetVisible;
@@ -697,7 +716,7 @@ function TfrmMain.OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr,
 var
   Data: PLogNode;
   bVisible: Boolean;
-  Nr: Integer;
+  TypeNrValues: TList<Integer>;
 begin
   Priority := Priority.ToLower;
 
@@ -734,13 +753,20 @@ begin
         Exit;
       end;
 
-    if not TypeNr.IsEmpty and TryStrToInt(TypeNr, Nr) then
-      if Data.LogTypeNr <> Nr then
-      begin
-        SetNodeVisible(Node, False);
-        Result := True;
-        Exit;
+    if not TypeNr.IsEmpty then
+    begin
+      TypeNrValues := ParseTypeNrFilter(TypeNr);
+      try
+        if (TypeNrValues.Count > 0) and (TypeNrValues.IndexOf(Data.LogTypeNr) < 0) then
+        begin
+          SetNodeVisible(Node, False);
+          Result := True;
+          Exit;
+        end;
+      finally
+        TypeNrValues.Free;
       end;
+    end;
 
     if not Filter.IsEmpty then
       if not Data.LogMessageLC.Contains(Filter.ToLower) and not Data.LogData.Contains(Filter) then
