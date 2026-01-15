@@ -329,22 +329,25 @@ function TDNLogClient.TruncateUTF8(const UTF8Text: TBytes;
 begin
   Result := UTF8Text;
 
+  if Length(Result) <= MaxDataLength then
+    Exit;
+
   var Counter := 0;
-  if Length(Result) > MaxDataLength then
-    for var i := MaxDataLength downto 0 do
+  for var i := MaxDataLength - 1 downto 0 do
+  begin
+    if (Result[i] and $C0) <> $80 then
     begin
-      if (Result[i] and $C0) <> $80 then
-      begin
-        SetLength(Result, i);
-        Break;
-      end;
-      Inc(Counter);
-      if Counter > 3 then
-      begin
-        Result := TEncoding.UTF8.GetBytes('[DNLOG ERROR: Incorrect UTF-8 message]');
-        Break;
-      end;
+      SetLength(Result, i);
+      Exit;
     end;
+    Inc(Counter);
+    if Counter > 3 then
+    begin
+      Result := TEncoding.UTF8.GetBytes('[DNLOG ERROR: Incorrect UTF-8 message]');
+      Exit;
+    end;
+  end;
+  SetLength(Result, 0);
 end;
 
 procedure TDNLogClient.x(const LogMessage: string);
