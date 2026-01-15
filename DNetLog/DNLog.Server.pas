@@ -19,6 +19,7 @@ type TDNLogServer = class(TObject)
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
     procedure TrimLeft(var AData: TBytes; ALength: Integer);
+    procedure LogInternalError(const Text: string);
   protected
     procedure _OnUDPRead(AThread: TIdUDPListenerThread; const AData: TIdBytes; ABinding: TIdSocketHandle);
     procedure _OnExecute(AContext: TIdContext);
@@ -127,6 +128,21 @@ begin
   Result := FServerUDP.Active and FServerTCP.Active;
 end;
 
+procedure TDNLogServer.LogInternalError(const Text: string);
+var
+  DNLogMessage: TDNLogMessage;
+begin
+  if Assigned(FOnLogReceived) then
+  begin
+    DNLogMessage.LogPriority := TDNLogPriority.prException;
+    DNLogMessage.LogTimestamp := 0;
+    DNLogMessage.LogTypeNr := 0;
+    DNLogMessage.LogMessage := Text;
+    SetLength(DNLogMessage.LogData, 0);
+    FOnLogReceived(Self, '0.0.0.0', DNLogMessage);
+  end;
+end;
+
 procedure TDNLogServer.SetActive(const Value: Boolean);
 begin
   if Value <> FServerUDP.Active then
@@ -162,7 +178,10 @@ begin
       if Assigned(FOnLogReceived) then
         FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
   except
-    // null
+    on e: Exception do
+    begin
+      LogInternalError(e.ToString);
+    end;
   end;
 end;
 
@@ -182,7 +201,10 @@ begin
           FOnLogReceived(Self, ABinding.PeerIP, LogMsg);
         SetLength(b, 0);
       except
-        // null
+        on e: Exception do
+        begin
+          LogInternalError(e.ToString);
+        end;
       end;
     end);
 end;
