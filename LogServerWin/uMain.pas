@@ -36,6 +36,7 @@ uses
   VirtualTrees.BaseTree,
   VirtualTrees.AncestorVCL,
   IdException,
+  uLogStats,
   DNLog.Types,
   DNLog.Server;
 
@@ -115,6 +116,21 @@ type
     actMessageCopy: TAction;
     vilType: TVirtualImageList;
     icType: TImageCollection;
+    pnlStats: TPanel;
+    lblStatsTitle: TLabel;
+    lblStatsTotal: TLabel;
+    lblStatsDebug: TLabel;
+    lblStatsInfo: TLabel;
+    lblStatsWarning: TLabel;
+    lblStatsError: TLabel;
+    lblStatsException: TLabel;
+    lblStatsThroughput: TLabel;
+    lblStatsClientsHdr: TLabel;
+    lblStatsClients: TLabel;
+    lblStatsTypesHdr: TLabel;
+    lblStatsTypes: TLabel;
+    tmrThroughput: TTimer;
+    procedure tmrThroughputTimer(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -144,6 +160,8 @@ type
     FServer: TDNLogServer;
     FLogUpdateThread: TLogUpdateThread;
     FSelectionTimer: TTimer;
+    FStats: TLogStats;
+    procedure UpdateStatsDisplay;
     procedure SelectionTimerTimer(Sender: TObject);
     function  FillNode(const Node: PVirtualNode; const LogMessage: TCLientLogMessage): PLogNode;
     procedure OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
@@ -179,8 +197,12 @@ procedure TfrmMain.actLogClearExecute(Sender: TObject);
 begin
   FLogUpdateThread.Logs.Clear;
   vList.Clear;
+  cbClient.Items.Clear;
+  cbTypeNr.Items.Clear;
   edtMessage.Text := '';
   edtData.Text    := '';
+  FStats.Clear;
+  UpdateStatsDisplay;
 end;
 
 procedure TfrmMain.actLogCopyExecute(Sender: TObject);
@@ -441,8 +463,12 @@ begin
   FSelectionTimer.Interval := 100;
   FSelectionTimer.OnTimer := SelectionTimerTimer;
 
+  FStats := TLogStats.Create;
+
   vList.RootNodecount := 0;
   vList.NodeDatasize  := SizeOf(TLogNode);
+
+  UpdateStatsDisplay;
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -452,6 +478,29 @@ begin
   FLogUpdateThread.Terminate;
   FLogUpdateThread.WaitFor;
   FreeAndNil(FLogUpdateThread);
+  FreeAndNil(FStats);
+end;
+
+procedure TfrmMain.UpdateStatsDisplay;
+begin
+  lblStatsTotal.Caption := Format('Total: %d', [FStats.Total]);
+  lblStatsDebug.Caption := Format('Debug: %d', [FStats.Debug]);
+  lblStatsInfo.Caption := Format('Info: %d', [FStats.Info]);
+  lblStatsWarning.Caption := Format('Warning: %d', [FStats.Warning]);
+  lblStatsError.Caption := Format('Error: %d', [FStats.Error]);
+  lblStatsException.Caption := Format('Exception: %d', [FStats.Exception]);
+  lblStatsClients.Caption := FStats.GetClientsText;
+  lblStatsTypes.Caption := FStats.GetTypesText;
+
+  // Update throughput during processing
+  FStats.UpdateThroughput;
+  lblStatsThroughput.Caption := Format('%.0f logs/s', [FStats.GetThroughput]);
+end;
+
+procedure TfrmMain.tmrThroughputTimer(Sender: TObject);
+begin
+  FStats.UpdateThroughput;
+  lblStatsThroughput.Caption := Format('%.0f logs/s', [FStats.GetThroughput]);
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
@@ -839,6 +888,7 @@ begin
         Data := FillNode(Node, Logs[Idx]);
         if Assigned(Data) then
         begin
+          FStats.AddLog(Data.LogPriority, Data.LogClient, Data.LogTypeNr);
           OnFilterLog(Node, PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter);
 
           if not ClientSet.ContainsKey(Data.LogClient) then
@@ -871,6 +921,8 @@ begin
     finally
       vList.EndUpdate;
     end;
+
+    UpdateStatsDisplay;
   finally
     ClientSet.Free;
     TypeNrSet.Free;
