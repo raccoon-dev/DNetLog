@@ -13,8 +13,9 @@ type TDNLogClient = class(TObject)
     class var
       FShuttingDown: Boolean;
       FDNLogClient: TDNLogClient;
+      FLock: TObject;
   strict protected
-    class function GetInstance: TDNLogClient; static; inline;
+    class function GetInstance: TDNLogClient; static;
     class function GetActive: Boolean; static; inline;
   private
     FDNLogSender: IDNLogSender;
@@ -24,6 +25,7 @@ type TDNLogClient = class(TObject)
     function ShrinkRawData(const LogData: TBytes): TBytes;
     procedure LogRaw(const Priority: TDNLogPriority; const LogTypeNr: ShortInt; const LogMessage: TBytes; const LogData: TBytes);
   public
+    class constructor Create;
     constructor Create(DNLogSender: IDNLogSender);
     class destructor Destroy;
     class property Active: Boolean read GetActive;
@@ -79,6 +81,11 @@ end;
 
 { TDNLogClient }
 
+class constructor TDNLogClient.Create;
+begin
+  FLock := TObject.Create;
+end;
+
 constructor TDNLogClient.Create(DNLogSender: IDNLogSender);
 begin
   Assert(Assigned(DNLogSender));
@@ -90,11 +97,11 @@ end;
 
 class destructor TDNLogClient.Destroy;
 begin
-  FShuttingDown := true;
+  FShuttingDown := True;
 {$IFDEF USE_DNLOGS}
   FreeAndNil(FDNLogClient);
 {$ENDIF}
-  inherited;
+  FreeAndNil(FLock);
 end;
 
 procedure TDNLogClient.e(const LogMessage: string; const Args: array of const);
@@ -117,19 +124,26 @@ class function TDNLogClient.GetInstance: TDNLogClient;
 begin
   if not Assigned(FDNLogClient) then
   begin
+    TMonitor.Enter(FLock);
+    try
+      if not Assigned(FDNLogClient) then
+      begin
 {$IFDEF USE_DNLOGS}
   {$IFDEF USE_UDP}
-    Result := TDNLogClient.Create(TDNLogSenderUDP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
+        Result := TDNLogClient.Create(TDNLogSenderUDP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
   {$ELSE}
-    Result := TDNLogClient.Create(TDNLogSenderTCP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
+        Result := TDNLogClient.Create(TDNLogSenderTCP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
   {$ENDIF}
 {$ELSE}
-    Result := TDNLogClient.Create(TDNLogSenderDummy.Create('', 0));;
+        Result := TDNLogClient.Create(TDNLogSenderDummy.Create('', 0));
 {$ENDIF}
-  end else
-  begin
-    Result := FDNLogClient;
+        Exit;
+      end;
+    finally
+      TMonitor.Exit(FLock);
+    end;
   end;
+  Result := FDNLogClient;
 end;
 
 procedure TDNLogClient.i(const LogMessage: string; const Args: array of const);
@@ -287,9 +301,14 @@ end;
 
 class function TDNLogClient.NewInstance: TObject;
 begin
-  if not assigned(FDNLogClient) then
-    FDNLogClient := TDNLogClient(inherited NewInstance);
-  Result := FDNLogClient;
+  TMonitor.Enter(FLock);
+  try
+    if not Assigned(FDNLogClient) then
+      FDNLogClient := TDNLogClient(inherited NewInstance);
+    Result := FDNLogClient;
+  finally
+    TMonitor.Exit(FLock);
+  end;
 end;
 
 function TDNLogClient.ShrinkMessage(const LogMessage: string): TBytes;
