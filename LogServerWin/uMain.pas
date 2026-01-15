@@ -235,10 +235,10 @@ var
   png: TPNGImage;
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
-  if dlgSaveImg.FilterIndex = FILE_PNG then
+  if dlgSaveImg.FilterIndex = IMAGE_FILE_PNG then
     dlgSaveImg.FileName := FName + EXT_PNG
   else
-  if dlgSaveImg.FilterIndex = FILE_BMP then
+  if dlgSaveImg.FilterIndex = IMAGE_FILE_BMP then
     dlgSaveImg.FileName := FName + EXT_BMP;
 
   if dlgSaveImg.Execute then
@@ -247,7 +247,7 @@ begin
     bmp := GetLogBitmap;
     if Assigned(bmp) then
       try
-        if dlgSaveImg.FilterIndex = FILE_PNG then
+        if dlgSaveImg.FilterIndex = IMAGE_FILE_PNG then
         begin
           if not TPath.GetExtension(FName).ToLower.Equals(EXT_PNG) then
             FName := FName + EXT_PNG;
@@ -260,7 +260,7 @@ begin
               png.Free;
             end;
         end else
-        if dlgSaveImg.FilterIndex = FILE_BMP then
+        if dlgSaveImg.FilterIndex = IMAGE_FILE_BMP then
         begin
           if not TPath.GetExtension(FName).ToLower.Equals(EXT_BMP) then
             FName := FName + EXT_BMP;
@@ -279,7 +279,7 @@ var
   sl: TStringList;
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
-  if dlgSave.FilterIndex = FILE_CSV then
+  if dlgSave.FilterIndex = TEXT_FILE_CSV then
     dlgSave.FileName := FName + EXT_CSV
   else
     dlgSave.FileName := FName + EXT_TXT; // We don't support anythig except csv, but maybe someday...
@@ -287,7 +287,7 @@ begin
   if dlgSave.Execute then
   begin
     FName := dlgSave.FileName;
-    if dlgSave.FilterIndex = FILE_CSV then
+    if dlgSave.FilterIndex = TEXT_FILE_CSV then
     begin
       if not TPath.GetExtension(FName).ToLower.Equals(EXT_CSV) then
         FName := FName + EXT_CSV;

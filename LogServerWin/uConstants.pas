@@ -17,9 +17,9 @@ const
   IMG_ERROR     = 3;
   IMG_EXCEPTION = 4;
 
-  FILE_CSV = 1;
-  FILE_PNG = 1;
-  FILE_BMP = 2;
+  TEXT_FILE_CSV = 1;
+  IMAGE_FILE_PNG = 1;
+  IMAGE_FILE_BMP = 2;
   EXT_CSV  = '.csv';
   EXT_PNG  = '.png';
   EXT_BMP  = '.bmp';
