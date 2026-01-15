@@ -13,8 +13,9 @@ type TDNLogClient = class(TObject)
     class var
       FShuttingDown: Boolean;
       FDNLogClient: TDNLogClient;
+      FLock: TObject;
   strict protected
-    class function GetInstance: TDNLogClient; static; inline;
+    class function GetInstance: TDNLogClient; static;
     class function GetActive: Boolean; static; inline;
   private
     FDNLogSender: IDNLogSender;
@@ -24,6 +25,7 @@ type TDNLogClient = class(TObject)
     function ShrinkRawData(const LogData: TBytes): TBytes;
     procedure LogRaw(const Priority: TDNLogPriority; const LogTypeNr: ShortInt; const LogMessage: TBytes; const LogData: TBytes);
   public
+    class constructor Create;
     constructor Create(DNLogSender: IDNLogSender);
     class destructor Destroy;
     class property Active: Boolean read GetActive;
@@ -79,6 +81,11 @@ end;
 
 { TDNLogClient }
 
+class constructor TDNLogClient.Create;
+begin
+  FLock := TObject.Create;
+end;
+
 constructor TDNLogClient.Create(DNLogSender: IDNLogSender);
 begin
   Assert(Assigned(DNLogSender));
@@ -90,11 +97,11 @@ end;
 
 class destructor TDNLogClient.Destroy;
 begin
-  FShuttingDown := true;
+  FShuttingDown := True;
 {$IFDEF USE_DNLOGS}
   FreeAndNil(FDNLogClient);
 {$ENDIF}
-  inherited;
+  FreeAndNil(FLock);
 end;
 
 procedure TDNLogClient.e(const LogMessage: string; const Args: array of const);
@@ -117,19 +124,26 @@ class function TDNLogClient.GetInstance: TDNLogClient;
 begin
   if not Assigned(FDNLogClient) then
   begin
+    TMonitor.Enter(FLock);
+    try
+      if not Assigned(FDNLogClient) then
+      begin
 {$IFDEF USE_DNLOGS}
   {$IFDEF USE_UDP}
-    Result := TDNLogClient.Create(TDNLogSenderUDP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
+        Result := TDNLogClient.Create(TDNLogSenderUDP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
   {$ELSE}
-    Result := TDNLogClient.Create(TDNLogSenderTCP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
+        Result := TDNLogClient.Create(TDNLogSenderTCP.Create(SERVER_ADDRESS, SERVER_BIND_PORT));
   {$ENDIF}
 {$ELSE}
-    Result := TDNLogClient.Create(TDNLogSenderDummy.Create('', 0));;
+        Result := TDNLogClient.Create(TDNLogSenderDummy.Create('', 0));
 {$ENDIF}
-  end else
-  begin
-    Result := FDNLogClient;
+        Exit;
+      end;
+    finally
+      TMonitor.Exit(FLock);
+    end;
   end;
+  Result := FDNLogClient;
 end;
 
 procedure TDNLogClient.i(const LogMessage: string; const Args: array of const);
@@ -252,34 +266,27 @@ begin
     Exit;
 
   dt := TThread.GetTickCount;
-  SetLength(sendBuffer,
-            1 {Priority} +
-            4 {timestamp} +
-            1 {TypeNr} +
-            2 {Message Length} +
-            2 {Data Length} +
-            Length(LogMessage) +
-            Length(LogData));
+  SetLength(sendBuffer, PACKET_HEADER_SIZE + Length(LogMessage) + Length(LogData));
 
-  sendBuffer[0] := Ord(Priority);   {Priority}
-  sendBuffer[1] := Byte(dt shr 24); {timestamp}
-  sendBuffer[2] := Byte(dt shr 16); {timestamp}
-  sendBuffer[3] := Byte(dt shr 8);  {timestamp}
-  sendBuffer[4] := Byte(dt);        {timestamp}
-  sendBuffer[5] := LogTypeNr;       {TypeNr}
-  sendBuffer[6] := Byte(Length(LogMessage) shr 8); {Message Length}
-  sendBuffer[7] := Byte(Length(LogMessage));       {Message Length}
+  sendBuffer[PACKET_OFFSET_PRIORITY] := Ord(Priority);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP]     := Byte(dt shr 24);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP + 1] := Byte(dt shr 16);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP + 2] := Byte(dt shr 8);
+  sendBuffer[PACKET_OFFSET_TIMESTAMP + 3] := Byte(dt);
+  sendBuffer[PACKET_OFFSET_TYPENR] := LogTypeNr;
+  sendBuffer[PACKET_OFFSET_MSGLEN]     := Byte(Length(LogMessage) shr 8);
+  sendBuffer[PACKET_OFFSET_MSGLEN + 1] := Byte(Length(LogMessage));
 
   {Message}
   if Length(LogMessage) > 0 then
-    System.Move(LogMessage[0], sendBuffer[8], Length(LogMessage));
+    System.Move(LogMessage[0], sendBuffer[PACKET_OFFSET_MESSAGE], Length(LogMessage));
 
-  sendBuffer[8 + Length(LogMessage)] := Byte(Length(LogData) shr 8); {Data Length}
-  sendBuffer[9 + Length(LogMessage)] := Byte(Length(LogData));       {Data Length}
+  sendBuffer[PACKET_OFFSET_MESSAGE + Length(LogMessage)]     := Byte(Length(LogData) shr 8);
+  sendBuffer[PACKET_OFFSET_MESSAGE + Length(LogMessage) + 1] := Byte(Length(LogData));
 
   {Data}
   if Length(LogData) > 0 then
-    System.Move(LogData[0], sendBuffer[10 + Length(LogMessage)], Length(LogData));
+    System.Move(LogData[0], sendBuffer[PACKET_HEADER_SIZE + Length(LogMessage)], Length(LogData));
 
   FDNLogSender.Write(sendBuffer);
 {$ENDIF}
@@ -287,9 +294,14 @@ end;
 
 class function TDNLogClient.NewInstance: TObject;
 begin
-  if not assigned(FDNLogClient) then
-    FDNLogClient := TDNLogClient(inherited NewInstance);
-  Result := FDNLogClient;
+  TMonitor.Enter(FLock);
+  try
+    if not Assigned(FDNLogClient) then
+      FDNLogClient := TDNLogClient(inherited NewInstance);
+    Result := FDNLogClient;
+  finally
+    TMonitor.Exit(FLock);
+  end;
 end;
 
 function TDNLogClient.ShrinkMessage(const LogMessage: string): TBytes;
@@ -310,22 +322,25 @@ function TDNLogClient.TruncateUTF8(const UTF8Text: TBytes;
 begin
   Result := UTF8Text;
 
+  if Length(Result) <= MaxDataLength then
+    Exit;
+
   var Counter := 0;
-  if Length(Result) > MaxDataLength then
-    for var i := MaxDataLength downto 0 do
+  for var i := MaxDataLength - 1 downto 0 do
+  begin
+    if (Result[i] and $C0) <> $80 then
     begin
-      if (Result[i] and $C0) <> $80 then
-      begin
-        SetLength(Result, i);
-        Break;
-      end;
-      Inc(Counter);
-      if Counter > 3 then
-      begin
-        Result := TEncoding.UTF8.GetBytes('[DNLOG ERROR: Incorrect UTF-8 message]');
-        Break;
-      end;
+      SetLength(Result, i);
+      Exit;
     end;
+    Inc(Counter);
+    if Counter > 3 then
+    begin
+      Result := TEncoding.UTF8.GetBytes('[DNLOG ERROR: Incorrect UTF-8 message]');
+      Exit;
+    end;
+  end;
+  SetLength(Result, 0);
 end;
 
 procedure TDNLogClient.x(const LogMessage: string);

@@ -7,7 +7,8 @@ uses
   DNLog.Server in '..\DNetLog\DNLog.Server.pas',
   Vcl.Themes,
   Vcl.Styles,
-  uConstants in 'uConstants.pas';
+  uConstants in 'uConstants.pas',
+  uLogStats in 'uLogStats.pas';
 
 {$R *.res}
 

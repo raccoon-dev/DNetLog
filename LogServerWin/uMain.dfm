@@ -151,8 +151,8 @@ object frmMain: TfrmMain
   object vList: TVirtualStringTree
     Left = 0
     Top = 57
-    Width = 729
-    Height = 391
+    Width = 549
+    Height = 388
     Align = alClient
     Colors.BorderColor = 5195575
     Colors.DisabledColor = clGray
@@ -199,6 +199,7 @@ object frmMain: TfrmMain
     OnGetHint = vListGetHint
     Touch.InteractiveGestures = [igPan, igPressAndTap]
     Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
+    ExplicitHeight = 391
     Columns = <
       item
         Alignment = taCenter
@@ -256,11 +257,125 @@ object frmMain: TfrmMain
         Width = 200
       end>
   end
+  object pnlStats: TPanel
+    Left = 549
+    Top = 57
+    Width = 180
+    Height = 388
+    Align = alRight
+    BevelOuter = bvLowered
+    TabOrder = 3
+    ExplicitHeight = 391
+    object lblStatsTitle: TLabel
+      Left = 8
+      Top = 8
+      Width = 53
+      Height = 13
+      Caption = 'Statistics'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+    object lblStatsTotal: TLabel
+      Left = 8
+      Top = 32
+      Width = 37
+      Height = 13
+      Caption = 'Total: 0'
+    end
+    object lblStatsDebug: TLabel
+      Left = 8
+      Top = 52
+      Width = 44
+      Height = 13
+      Caption = 'Debug: 0'
+    end
+    object lblStatsInfo: TLabel
+      Left = 8
+      Top = 68
+      Width = 33
+      Height = 13
+      Caption = 'Info: 0'
+    end
+    object lblStatsWarning: TLabel
+      Left = 8
+      Top = 84
+      Width = 53
+      Height = 13
+      Caption = 'Warning: 0'
+    end
+    object lblStatsError: TLabel
+      Left = 8
+      Top = 100
+      Width = 37
+      Height = 13
+      Caption = 'Error: 0'
+    end
+    object lblStatsException: TLabel
+      Left = 8
+      Top = 116
+      Width = 60
+      Height = 13
+      Caption = 'Exception: 0'
+    end
+    object lblStatsThroughput: TLabel
+      Left = 8
+      Top = 140
+      Width = 37
+      Height = 13
+      Caption = '0 logs/s'
+    end
+    object lblStatsClientsHdr: TLabel
+      Left = 8
+      Top = 164
+      Width = 41
+      Height = 13
+      Caption = 'Clients:'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+    object lblStatsClients: TLabel
+      Left = 8
+      Top = 180
+      Width = 164
+      Height = 52
+      AutoSize = False
+      WordWrap = True
+    end
+    object lblStatsTypesHdr: TLabel
+      Left = 8
+      Top = 240
+      Width = 37
+      Height = 13
+      Caption = 'Types:'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+    object lblStatsTypes: TLabel
+      Left = 8
+      Top = 256
+      Width = 164
+      Height = 120
+      AutoSize = False
+      WordWrap = True
+    end
+  end
   object pnlDetails: TPanel
     Left = 0
-    Top = 448
+    Top = 445
     Width = 729
-    Height = 77
+    Height = 80
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 2
@@ -292,7 +407,7 @@ object frmMain: TfrmMain
     end
     object sbMain: TStatusBar
       Left = 0
-      Top = 58
+      Top = 61
       Width = 729
       Height = 19
       Panels = <
@@ -302,6 +417,7 @@ object frmMain: TfrmMain
         item
           Width = 200
         end>
+      ExplicitTop = 58
     end
   end
   object pmnuMain: TPopupMenu
@@ -374,6 +490,12 @@ object frmMain: TfrmMain
     Enabled = False
     OnTimer = tmrFilterTimer
     Left = 272
+    Top = 264
+  end
+  object tmrThroughput: TTimer
+    Interval = 500
+    OnTimer = tmrThroughputTimer
+    Left = 344
     Top = 264
   end
   object dlgSaveImg: TSavePictureDialog

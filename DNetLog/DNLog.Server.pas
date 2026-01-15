@@ -19,6 +19,7 @@ type TDNLogServer = class(TObject)
     function GetActive: Boolean;
     procedure SetActive(const Value: Boolean);
     procedure TrimLeft(var AData: TBytes; ALength: Integer);
+    procedure LogInternalError(const Text: string);
   protected
     procedure _OnUDPRead(AThread: TIdUDPListenerThread; const AData: TIdBytes; ABinding: TIdSocketHandle);
     procedure _OnExecute(AContext: TIdContext);
@@ -34,7 +35,6 @@ implementation
 
 const
   DEFAULT_UDP_BUFFER_LENGTH = 20*1024*1024; // 20 [MB]
-  MIN_PACKET_LENGTH = 10;
 
 { TDNLogServer }
 
@@ -72,43 +72,52 @@ var
   TextLen, DataLen: Word;
 begin
   Result := False;
-  if Length(ABytes) < MIN_PACKET_LENGTH then
+  if Length(ABytes) < PACKET_HEADER_SIZE then
     Exit;
 
-  AMessage.LogPriority := TDNLogPriority(ABytes[0]);
-  AMessage.LogTimestamp := (ABytes[1] shl 24) +
-                         (ABytes[2] shl 16) +
-                         (ABytes[3] shl 8) +
-                          ABytes[4];
-  AMessage.LogTypeNr := ABytes[5];
+  AMessage.LogPriority := TDNLogPriority(ABytes[PACKET_OFFSET_PRIORITY]);
+  AMessage.LogTimestamp := (ABytes[PACKET_OFFSET_TIMESTAMP] shl 24) +
+                           (ABytes[PACKET_OFFSET_TIMESTAMP + 1] shl 16) +
+                           (ABytes[PACKET_OFFSET_TIMESTAMP + 2] shl 8) +
+                            ABytes[PACKET_OFFSET_TIMESTAMP + 3];
+  AMessage.LogTypeNr := ABytes[PACKET_OFFSET_TYPENR];
+
+  // Message text length
+  TextLen := (ABytes[PACKET_OFFSET_MSGLEN] shl 8) + ABytes[PACKET_OFFSET_MSGLEN + 1];
+
+  // Validate we have enough bytes for: header + TextLen + DataLenField(2)
+  if Length(ABytes) < PACKET_OFFSET_MESSAGE + TextLen + PACKET_SIZE_DATALEN then
+    Exit;
 
   // Message text
-  TextLen := (ABytes[6] shl 8) + ABytes[7];
-  if TextLen > Length(ABytes) - MIN_PACKET_LENGTH then
-    Exit;
   if TextLen > 0 then
-    AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), 8, TextLen)
+  begin
+    try
+      AMessage.LogMessage := TEncoding.UTF8.GetString(TBytes(ABytes), PACKET_OFFSET_MESSAGE, TextLen);
+    except
+      AMessage.LogMessage := '[Invalid UTF-8 data]';
+    end;
+  end
   else
     AMessage.LogMessage := string.Empty;
 
-  // Message data
-  DataLen := (ABytes[8 + TextLen] shl 8) + ABytes[9 + TextLen];
-  if DataLen > Length(ABytes) - TextLen - MIN_PACKET_LENGTH then
+  // Message data length
+  DataLen := (ABytes[PACKET_OFFSET_MESSAGE + TextLen] shl 8) + ABytes[PACKET_OFFSET_MESSAGE + TextLen + 1];
+
+  // Validate we have enough bytes for full packet
+  if Length(ABytes) < PACKET_HEADER_SIZE + TextLen + DataLen then
     Exit;
+
+  // Message data
   if DataLen > 0 then
   begin
     SetLength(AMessage.LogData, DataLen);
-    System.Move(ABytes[MIN_PACKET_LENGTH + TextLen], AMessage.LogData[0], DataLen);
-  end else
-    SetLength(AMessage.LogData, 0); // Not really necessary
-  TrimLeft(TBytes(ABytes),
-            1 {Priority} +
-            4 {timestamp} +
-            1 {TypeNr} +
-            2 {Message Length} +
-            2 {Data Length} +
-            TextLen +
-            DataLen);
+    System.Move(ABytes[PACKET_HEADER_SIZE + TextLen], AMessage.LogData[0], DataLen);
+  end
+  else
+    SetLength(AMessage.LogData, 0);
+
+  TrimLeft(TBytes(ABytes), PACKET_HEADER_SIZE + TextLen + DataLen);
   Result := True;
 end;
 
@@ -127,6 +136,21 @@ begin
   Result := FServerUDP.Active and FServerTCP.Active;
 end;
 
+procedure TDNLogServer.LogInternalError(const Text: string);
+var
+  DNLogMessage: TDNLogMessage;
+begin
+  if Assigned(FOnLogReceived) then
+  begin
+    DNLogMessage.LogPriority := TDNLogPriority.prException;
+    DNLogMessage.LogTimestamp := 0;
+    DNLogMessage.LogTypeNr := 0;
+    DNLogMessage.LogMessage := Text;
+    SetLength(DNLogMessage.LogData, 0);
+    FOnLogReceived(Self, '0.0.0.0', DNLogMessage);
+  end;
+end;
+
 procedure TDNLogServer.SetActive(const Value: Boolean);
 begin
   if Value <> FServerUDP.Active then
@@ -137,12 +161,18 @@ end;
 
 procedure TDNLogServer.TrimLeft(var AData: TBytes; ALength: Integer);
 var
-  Result: TBytes;
+  NewData: TBytes;
 begin
-  SetLength(Result, Length(AData) - ALength);
-  System.Move(AData[ALength], Result[0], Length(Result));
-  SetLength(AData, 0);
-  AData := Result;
+  if ALength <= 0 then
+    Exit;
+  if ALength >= Length(AData) then
+  begin
+    SetLength(AData, 0);
+    Exit;
+  end;
+  SetLength(NewData, Length(AData) - ALength);
+  System.Move(AData[ALength], NewData[0], Length(NewData));
+  AData := NewData;
 end;
 
 procedure TDNLogServer._OnExecute(AContext: TIdContext);
@@ -156,7 +186,10 @@ begin
       if Assigned(FOnLogReceived) then
         FOnLogReceived(Self, AContext.Binding.PeerIP, DNLogMessage);
   except
-    // null
+    on e: Exception do
+    begin
+      LogInternalError(e.ToString);
+    end;
   end;
 end;
 
@@ -176,7 +209,10 @@ begin
           FOnLogReceived(Self, ABinding.PeerIP, LogMsg);
         SetLength(b, 0);
       except
-        // null
+        on e: Exception do
+        begin
+          LogInternalError(e.ToString);
+        end;
       end;
     end);
 end;

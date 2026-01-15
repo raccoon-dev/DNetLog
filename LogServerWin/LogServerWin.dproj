@@ -144,6 +144,7 @@
         <DCCReference Include="..\DNetLog\DNLog.Types.pas"/>
         <DCCReference Include="..\DNetLog\DNLog.Server.pas"/>
         <DCCReference Include="uConstants.pas"/>
+        <DCCReference Include="uLogStats.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -171,6 +172,18 @@
             </Delphi.Personality>
             <Deployment Version="5">
                 <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput"/>
+                <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win64">
+                        <RemoteName>LogServerWin.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="..\bin\Win64\Debug\LogServerWin.rsm" Configuration="Debug" Class="DebugSymbols">
+                    <Platform Name="Win64">
+                        <RemoteName>LogServerWin.rsm</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="..\bin\Win64\Release\LogServerWin.exe" Configuration="Release" Class="ProjectOutput"/>
                 <DeployFile LocalName="Win32\Debug\LogServerWin.exe" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployClass Name="AdditionalDebugSymbols">

@@ -36,6 +36,7 @@ uses
   VirtualTrees.BaseTree,
   VirtualTrees.AncestorVCL,
   IdException,
+  uLogStats,
   DNLog.Types,
   DNLog.Server;
 
@@ -66,10 +67,15 @@ type
   private
     FLogs: TThreadList<TCLientLogMessage>;
     FOnProcessLogs: TOnProcessLogs;
+    FDroppedCount: Int64;
     function Min(Value1, Value2: Integer): Integer; inline;
   public
+    constructor Create(CreateSuspended: Boolean);
+    destructor Destroy; override;
     procedure Execute; override;
+    procedure AddLog(const ClientIP: string; const LogMessage: TDNLogMessage);
     property Logs: TThreadList<TCLientLogMessage> read FLogs;
+    property DroppedCount: Int64 read FDroppedCount;
     property OnProcessLogs: TOnProcessLogs read FOnProcessLogs write FOnProcessLogs;
   end;
 
@@ -110,6 +116,21 @@ type
     actMessageCopy: TAction;
     vilType: TVirtualImageList;
     icType: TImageCollection;
+    pnlStats: TPanel;
+    lblStatsTitle: TLabel;
+    lblStatsTotal: TLabel;
+    lblStatsDebug: TLabel;
+    lblStatsInfo: TLabel;
+    lblStatsWarning: TLabel;
+    lblStatsError: TLabel;
+    lblStatsException: TLabel;
+    lblStatsThroughput: TLabel;
+    lblStatsClientsHdr: TLabel;
+    lblStatsClients: TLabel;
+    lblStatsTypesHdr: TLabel;
+    lblStatsTypes: TLabel;
+    tmrThroughput: TTimer;
+    procedure tmrThroughputTimer(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure vListGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -138,12 +159,17 @@ type
     { Private declarations }
     FServer: TDNLogServer;
     FLogUpdateThread: TLogUpdateThread;
+    FSelectionTimer: TTimer;
+    FStats: TLogStats;
+    procedure UpdateStatsDisplay;
+    procedure SelectionTimerTimer(Sender: TObject);
     function  FillNode(const Node: PVirtualNode; const LogMessage: TCLientLogMessage): PLogNode;
     procedure OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
     procedure LogRowToString(AData: PLogNode; StringBuilder: TStringBuilder; const ASeparator: String; const AAddNewLine: Boolean; const AGetHeader: Boolean = False);
     procedure ExportCSV(StringBuilder: TStringBuilder);
     procedure FilterLog(Priority, Client, TypeNr, Filter: string);
     function  OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
+    function  ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
     function  BytesToStr(Bytes: TBytes): string;
     function  GetLogBitmap: TBitmap;
@@ -171,8 +197,12 @@ procedure TfrmMain.actLogClearExecute(Sender: TObject);
 begin
   FLogUpdateThread.Logs.Clear;
   vList.Clear;
+  cbClient.Items.Clear;
+  cbTypeNr.Items.Clear;
   edtMessage.Text := '';
   edtData.Text    := '';
+  FStats.Clear;
+  UpdateStatsDisplay;
 end;
 
 procedure TfrmMain.actLogCopyExecute(Sender: TObject);
@@ -235,10 +265,10 @@ var
   png: TPNGImage;
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
-  if dlgSaveImg.FilterIndex = FILE_PNG then
+  if dlgSaveImg.FilterIndex = IMAGE_FILE_PNG then
     dlgSaveImg.FileName := FName + EXT_PNG
   else
-  if dlgSaveImg.FilterIndex = FILE_BMP then
+  if dlgSaveImg.FilterIndex = IMAGE_FILE_BMP then
     dlgSaveImg.FileName := FName + EXT_BMP;
 
   if dlgSaveImg.Execute then
@@ -247,7 +277,7 @@ begin
     bmp := GetLogBitmap;
     if Assigned(bmp) then
       try
-        if dlgSaveImg.FilterIndex = FILE_PNG then
+        if dlgSaveImg.FilterIndex = IMAGE_FILE_PNG then
         begin
           if not TPath.GetExtension(FName).ToLower.Equals(EXT_PNG) then
             FName := FName + EXT_PNG;
@@ -260,7 +290,7 @@ begin
               png.Free;
             end;
         end else
-        if dlgSaveImg.FilterIndex = FILE_BMP then
+        if dlgSaveImg.FilterIndex = IMAGE_FILE_BMP then
         begin
           if not TPath.GetExtension(FName).ToLower.Equals(EXT_BMP) then
             FName := FName + EXT_BMP;
@@ -279,7 +309,7 @@ var
   sl: TStringList;
 begin
   FName := SAVE_FILE_PREFIX + FormatDateTime(SAVE_FILE_DATE, Now);
-  if dlgSave.FilterIndex = FILE_CSV then
+  if dlgSave.FilterIndex = TEXT_FILE_CSV then
     dlgSave.FileName := FName + EXT_CSV
   else
     dlgSave.FileName := FName + EXT_TXT; // We don't support anythig except csv, but maybe someday...
@@ -287,7 +317,7 @@ begin
   if dlgSave.Execute then
   begin
     FName := dlgSave.FileName;
-    if dlgSave.FilterIndex = FILE_CSV then
+    if dlgSave.FilterIndex = TEXT_FILE_CSV then
     begin
       if not TPath.GetExtension(FName).ToLower.Equals(EXT_CSV) then
         FName := FName + EXT_CSV;
@@ -397,7 +427,7 @@ begin
 
   Result.LogPriority        := LogMessage.DNLogMessage.LogPriority;
   Result.LogTimestamp       := LogMessage.DNLogMessage.LogTimestamp;
-  Result.LogTimestampString := IntToStr(Result.LogTimestamp);
+  Result.LogTimestampString := Format('%d.%.3d', [Result.LogTimestamp div 1000, Result.LogTimestamp mod 1000]);
   Result.LogClient          := LogMessage.ClientIP;
   Result.LogTypeNr          := LogMessage.DNLogMessage.LogTypeNr;
   Result.LogTypeNrString    := IntToStr(Result.LogTypeNr);
@@ -424,12 +454,21 @@ end;
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FLogUpdateThread := TLogUpdateThread.Create(True);
-  FLogUpdateThread.FreeOnTerminate := True;
+  FLogUpdateThread.FreeOnTerminate := False;
   FLogUpdateThread.OnProcessLogs := OnLogsProcess;
   FLogUpdateThread.Start;
 
+  FSelectionTimer := TTimer.Create(Self);
+  FSelectionTimer.Enabled := False;
+  FSelectionTimer.Interval := 100;
+  FSelectionTimer.OnTimer := SelectionTimerTimer;
+
+  FStats := TLogStats.Create;
+
   vList.RootNodecount := 0;
   vList.NodeDatasize  := SizeOf(TLogNode);
+
+  UpdateStatsDisplay;
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -437,6 +476,31 @@ begin
   if Assigned(FServer) then
     FreeAndNil(FServer);
   FLogUpdateThread.Terminate;
+  FLogUpdateThread.WaitFor;
+  FreeAndNil(FLogUpdateThread);
+  FreeAndNil(FStats);
+end;
+
+procedure TfrmMain.UpdateStatsDisplay;
+begin
+  lblStatsTotal.Caption := Format('Total: %d', [FStats.Total]);
+  lblStatsDebug.Caption := Format('Debug: %d', [FStats.Debug]);
+  lblStatsInfo.Caption := Format('Info: %d', [FStats.Info]);
+  lblStatsWarning.Caption := Format('Warning: %d', [FStats.Warning]);
+  lblStatsError.Caption := Format('Error: %d', [FStats.Error]);
+  lblStatsException.Caption := Format('Exception: %d', [FStats.Exception]);
+  lblStatsClients.Caption := FStats.GetClientsText;
+  lblStatsTypes.Caption := FStats.GetTypesText;
+
+  // Update throughput during processing
+  FStats.UpdateThroughput;
+  lblStatsThroughput.Caption := Format('%.0f logs/s', [FStats.GetThroughput]);
+end;
+
+procedure TfrmMain.tmrThroughputTimer(Sender: TObject);
+begin
+  FStats.UpdateThroughput;
+  lblStatsThroughput.Caption := Format('%.0f logs/s', [FStats.GetThroughput]);
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
@@ -521,6 +585,52 @@ begin
   end;
 end;
 
+function TfrmMain.ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
+var
+  Parts: TArray<string>;
+  RangeParts: TArray<string>;
+  Part: string;
+  Value, RangeStart, RangeEnd, j: Integer;
+  i: Integer;
+begin
+  Result := TList<Integer>.Create;
+  if TypeNrFilter.IsEmpty then
+    Exit;
+
+  // Split by space, comma, semicolon, or dot
+  Parts := TypeNrFilter.Split([' ', ',', ';', '.'], TStringSplitOptions.ExcludeEmpty);
+
+  for i := 0 to High(Parts) do
+  begin
+    Part := Parts[i].Trim;
+
+    // Check if it's a range (contains hyphen)
+    if Part.Contains('-') then
+    begin
+      RangeParts := Part.Split(['-']);
+      if (Length(RangeParts) = 2) and
+         TryStrToInt(RangeParts[0].Trim, RangeStart) and
+         TryStrToInt(RangeParts[1].Trim, RangeEnd) then
+      begin
+        // Add all values in range (inclusive)
+        if RangeStart <= RangeEnd then
+          for j := RangeStart to RangeEnd do
+            Result.Add(j)
+        else
+          // Handle reverse range (e.g., 5-1)
+          for j := RangeStart downto RangeEnd do
+            Result.Add(j);
+      end;
+    end
+    else
+    begin
+      // Single value
+      if TryStrToInt(Part, Value) then
+        Result.Add(Value);
+    end;
+  end;
+end;
+
 procedure TfrmMain.SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
 begin
   vList.IsFiltered[Node] := not SetVisible;
@@ -543,29 +653,22 @@ end;
 procedure TfrmMain.vListAddToSelection(Sender: TBaseVirtualTree;
   Node: PVirtualNode);
 var
-  n: PVirtualNode;
   d: PLogNode;
-  min, max: Cardinal;
 begin
   if Sender.SelectedCount > 1 then
   begin
+    // Multiple selection - update count immediately, defer time calculation
     edtMessage.Text := '';
     edtData.Text    := '';
     sbMain.Panels[SBAR_SEL_COUNT].Text := Format('Selected %d rows', [Sender.SelectedCount]);
-    min := Cardinal.MaxValue;
-    max := Cardinal.MinValue;
-    for n in Sender.SelectedNodes do
-    begin
-      d := Sender.GetNodeData(n);
-      if Assigned(d) then
-        if d.LogTimestamp < min then
-          min := d.LogTimestamp else
-        if d.LogTimestamp > max then
-          max := d.LogTimestamp;
-      sbMain.Panels[SBAR_SEL_TIME].Text := Format('∆ time = %d [ms]', [max - min]);
-    end;
+    sbMain.Panels[SBAR_SEL_TIME].Text := 'Calculating...';
+    // Reset timer to calculate delta time after selection is complete
+    FSelectionTimer.Enabled := False;
+    FSelectionTimer.Enabled := True;
   end else
   begin
+    // Single selection - show details immediately
+    FSelectionTimer.Enabled := False;
     sbMain.Panels[SBAR_SEL_COUNT].Text := string.Empty;
     sbMain.Panels[SBAR_SEL_TIME].Text := string.Empty;
     if Assigned(Node) then
@@ -582,6 +685,33 @@ begin
       edtData.Text    := '';
     end;
   end;
+end;
+
+procedure TfrmMain.SelectionTimerTimer(Sender: TObject);
+var
+  n: PVirtualNode;
+  d: PLogNode;
+  min, max: Cardinal;
+begin
+  FSelectionTimer.Enabled := False;
+
+  if vList.SelectedCount <= 1 then
+    Exit;
+
+  min := Cardinal.MaxValue;
+  max := Cardinal.MinValue;
+  for n in vList.SelectedNodes do
+  begin
+    d := vList.GetNodeData(n);
+    if Assigned(d) then
+    begin
+      if d.LogTimestamp < min then
+        min := d.LogTimestamp;
+      if d.LogTimestamp > max then
+        max := d.LogTimestamp;
+    end;
+  end;
+  sbMain.Panels[SBAR_SEL_TIME].Text := Format('∆ time = %d.%.3d [s]', [(max - min) div 1000, (max - min) mod 1000]);
 end;
 
 procedure TfrmMain.vListFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
@@ -663,7 +793,7 @@ function TfrmMain.OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr,
 var
   Data: PLogNode;
   bVisible: Boolean;
-  Nr: Integer;
+  TypeNrValues: TList<Integer>;
 begin
   Priority := Priority.ToLower;
 
@@ -700,13 +830,20 @@ begin
         Exit;
       end;
 
-    if not TypeNr.IsEmpty and TryStrToInt(TypeNr, Nr) then
-      if Data.LogTypeNr <> Nr then
-      begin
-        SetNodeVisible(Node, False);
-        Result := True;
-        Exit;
+    if not TypeNr.IsEmpty then
+    begin
+      TypeNrValues := ParseTypeNrFilter(TypeNr);
+      try
+        if (TypeNrValues.Count > 0) and (TypeNrValues.IndexOf(Data.LogTypeNr) < 0) then
+        begin
+          SetNodeVisible(Node, False);
+          Result := True;
+          Exit;
+        end;
+      finally
+        TypeNrValues.Free;
       end;
+    end;
 
     if not Filter.IsEmpty then
       if not Data.LogMessageLC.Contains(Filter.ToLower) and not Data.LogData.Contains(Filter) then
@@ -723,103 +860,155 @@ end;
 procedure TfrmMain.OnLogReceived(Sender: TObject; const ClientIP: string;
   const LogMessage: TDNLogMessage);
 begin
-  var Queue := FLogUpdateThread.Logs.LockList;
-  Queue.Add(TCLientLogMessage.Create(ClientIP, LogMessage));
-  FLogUpdateThread.Logs.UnlockList;
+  FLogUpdateThread.AddLog(ClientIP, LogMessage);
 end;
 
 procedure TfrmMain.OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
 var
-  Node, Nod: PVirtualNode;
+  Node, Nod, LastNode, LastOldNode: PVirtualNode;
   Data: PLogNode;
+  PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter: string;
+  ClientSet, TypeNrSet: TDictionary<string, Boolean>;
+  WasAtBottom: Boolean;
 begin
-  vList.BeginUpdate;
+  if Length(Logs) = 0 then
+    Exit;
+
+  // Cache filter values
+  PriorityFilter := cbPriority.Text;
+  ClientFilter := cbClient.Text;
+  TypeNrFilter := cbTypeNr.Text;
+  MessageFilter := edtFilter.Text;
+
+  // Build sets of existing clients/types for O(1) lookup
+  ClientSet := TDictionary<string, Boolean>.Create;
+  TypeNrSet := TDictionary<string, Boolean>.Create;
   try
-    for var Idx := Low(Logs) to High(Logs) do
-    begin
-      if FLogUpdateThread.Terminated then
-        Exit;
+    for var i := 0 to cbClient.Items.Count - 1 do
+      ClientSet.AddOrSetValue(cbClient.Items[i], True);
+    for var i := 0 to cbTypeNr.Items.Count - 1 do
+      TypeNrSet.AddOrSetValue(cbTypeNr.Items[i], True);
 
-      vList.RootNodeCount := vList.RootNodeCount + 1;
-      Node := vList.GetLast;
-      if Assigned(Node) then
-        Data := FillNode(Node, Logs[Idx])
+    // Remember last node before adding new ones (O(1) way to find first new node)
+    LastOldNode := vList.GetLast;
+
+    // Check if user was at bottom (for auto-scroll decision)
+    WasAtBottom := (LastOldNode = nil) or (vList.BottomNode = LastOldNode);
+
+    vList.BeginUpdate;
+    try
+
+      // Add all nodes at once
+      vList.RootNodeCount := vList.RootNodeCount + Cardinal(Length(Logs));
+
+      // Get first new node in O(1)
+      if Assigned(LastOldNode) then
+        Node := vList.GetNextSibling(LastOldNode)
       else
-        Exit;
+        Node := vList.GetFirst;
 
-      if FLogUpdateThread.Terminated then
-        Exit;
-
-      if not Assigned(Data) then
-        Continue;
-
-      OnFilterLog(Node, cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text);
-      if cbClient.Items.IndexOf(Data.LogClient) < 0 then
-        cbClient.Items.Append(Data.LogClient);
-
-      if cbTypeNr.Items.IndexOf(Data.LogTypeNrString) < 0 then
-        cbTypeNr.Items.Append(Data.LogTypeNrString);
-
-      if Idx >= High(Logs) then
+      LastNode := nil;
+      for var Idx := Low(Logs) to High(Logs) do
       begin
-        if chkAutoScroll.Checked then
+        if FLogUpdateThread.Terminated or not Assigned(Node) then
+          Exit;
+
+        Data := FillNode(Node, Logs[Idx]);
+        if Assigned(Data) then
         begin
-          vList.FocusedNode := Node;
-          for Nod in vList.SelectedNodes do
-            vList.Selected[Nod] := False;
-          vList.Selected[Node] := True;
-          vList.ScrollIntoView(Node, false);
+          FStats.AddLog(Data.LogPriority, Data.LogClient, Data.LogTypeNr);
+          OnFilterLog(Node, PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter);
+
+          if not ClientSet.ContainsKey(Data.LogClient) then
+          begin
+            ClientSet.Add(Data.LogClient, True);
+            cbClient.Items.Append(Data.LogClient);
+          end;
+
+          if not TypeNrSet.ContainsKey(Data.LogTypeNrString) then
+          begin
+            TypeNrSet.Add(Data.LogTypeNrString, True);
+            cbTypeNr.Items.Append(Data.LogTypeNrString);
+          end;
         end;
+
+        LastNode := Node;
+        Node := vList.GetNextSibling(Node);
       end;
 
+      // Auto-scroll only if checkbox is checked AND user was at bottom
+      if chkAutoScroll.Checked and WasAtBottom and Assigned(LastNode) then
+      begin
+        vList.FocusedNode := LastNode;
+        for Nod in vList.SelectedNodes do
+          vList.Selected[Nod] := False;
+        vList.Selected[LastNode] := True;
+        vList.ScrollIntoView(LastNode, False);
+      end;
+
+    finally
+      vList.EndUpdate;
     end;
+
+    UpdateStatsDisplay;
   finally
-    vList.EndUpdate;
+    ClientSet.Free;
+    TypeNrSet.Free;
   end;
 end;
 
 { TLogUpdateThread }
 
+constructor TLogUpdateThread.Create(CreateSuspended: Boolean);
+begin
+  inherited Create(CreateSuspended);
+  FLogs := TThreadList<TCLientLogMessage>.Create;
+  FDroppedCount := 0;
+end;
+
+destructor TLogUpdateThread.Destroy;
+begin
+  FLogs.Free;
+  inherited;
+end;
+
 procedure TLogUpdateThread.Execute;
 begin
   inherited;
-  FLogs := TThreadList<TCLientLogMessage>.Create;
-  try
 
-    while not Terminated do
+  while not Terminated do
+  begin
+    var Queue := FLogs.LockList;
+    if Queue.Count > 0 then
     begin
-      var Queue := FLogs.LockList;
-      if Queue.Count > 0 then
+      if Assigned(FOnProcessLogs) then
       begin
-        if Assigned(FOnProcessLogs) then
-        begin
-          var LogsCount := Min(REFRESH_LIST_LOGS_COUNT, Queue.Count);
-          var Logs: TArray<TCLientLogMessage>;
-          SetLength(Logs, LogsCount);
-          for var i := 0 to LogsCount - 1 do
-            Logs[i] := Queue[i];
-          Queue.DeleteRange(0, LogsCount);
-          FLogs.UnlockList;
-
-          if not Terminated then
-            TThread.Synchronize(nil, procedure
-            begin
-              FOnProcessLogs(Logs);
-            end);
-
-          SetLength(Logs, 0);
-
-        end else
-        begin
-          Queue.Clear;
-          FLogs.UnlockList;
-        end;
-      end else
+        var LogsCount := Min(REFRESH_LIST_LOGS_COUNT, Queue.Count);
+        var Logs: TArray<TCLientLogMessage>;
+        SetLength(Logs, LogsCount);
+        for var i := 0 to LogsCount - 1 do
+          Logs[i] := Queue[i];
+        Queue.DeleteRange(0, LogsCount);
         FLogs.UnlockList;
-    end;
 
-  finally
-    FLogs.Free;
+        if not Terminated then
+          TThread.Synchronize(nil, procedure
+          begin
+            FOnProcessLogs(Logs);
+          end);
+
+        SetLength(Logs, 0);
+
+      end else
+      begin
+        Queue.Clear;
+        FLogs.UnlockList;
+      end;
+    end else
+    begin
+      FLogs.UnlockList;
+      Sleep(10);
+    end;
   end;
 end;
 
@@ -829,6 +1018,26 @@ begin
     Result := Value1
   else
     Result := Value2;
+end;
+
+procedure TLogUpdateThread.AddLog(const ClientIP: string; const LogMessage: TDNLogMessage);
+var
+  Queue: TList<TCLientLogMessage>;
+  DropCount: Integer;
+begin
+  Queue := FLogs.LockList;
+  try
+    // Drop oldest logs if queue is full
+    if Queue.Count >= MAX_LOG_QUEUE_SIZE then
+    begin
+      DropCount := Queue.Count - MAX_LOG_QUEUE_SIZE + 1;
+      Queue.DeleteRange(0, DropCount);
+      Inc(FDroppedCount, DropCount);
+    end;
+    Queue.Add(TCLientLogMessage.Create(ClientIP, LogMessage));
+  finally
+    FLogs.UnlockList;
+  end;
 end;
 
 { TCLientLogMessage }

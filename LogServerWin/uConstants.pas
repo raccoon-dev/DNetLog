@@ -17,9 +17,9 @@ const
   IMG_ERROR     = 3;
   IMG_EXCEPTION = 4;
 
-  FILE_CSV = 1;
-  FILE_PNG = 1;
-  FILE_BMP = 2;
+  TEXT_FILE_CSV = 1;
+  IMAGE_FILE_PNG = 1;
+  IMAGE_FILE_BMP = 2;
   EXT_CSV  = '.csv';
   EXT_PNG  = '.png';
   EXT_BMP  = '.bmp';
@@ -31,7 +31,8 @@ const
   SAVE_FILE_PREFIX = 'DNetLog_';
   SAVE_FILE_DATE   = 'yyyymmdd_hhnnss';
 
-  REFRESH_LIST_LOGS_COUNT = 8000;
+  REFRESH_LIST_LOGS_COUNT = 50000;
+  MAX_LOG_QUEUE_SIZE = 500000;
 
 implementation
 
