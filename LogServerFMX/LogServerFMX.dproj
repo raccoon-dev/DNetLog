@@ -4,7 +4,7 @@
         <ProjectVersion>20.5</ProjectVersion>
         <FrameworkType>FMX</FrameworkType>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Debug</Config>
+        <Config Condition="'$(Config)'==''">Release</Config>
         <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectName Condition="'$(ProjectName)'==''">LogServerFMX</ProjectName>
         <TargetedPlatforms>2</TargetedPlatforms>
@@ -145,11 +145,10 @@
         <DCCReference Include="..\LogServerShared\uConstants.pas"/>
         <DCCReference Include="..\LogServerShared\uLogStats.pas"/>
         <DCCReference Include="..\LogServerShared\uLogCommon.pas"/>
+        <DCCReference Include="..\LogServerShared\uLogStore.pas"/>
+        <DCCReference Include="..\LogServerShared\uMcpServer.pas"/>
         <DCCReference Include="..\DNetLog\DNLog.Server.pas"/>
         <DCCReference Include="..\DNetLog\DNLog.Types.pas"/>
-        <RcCompile Include="LogServerFMX.Styles.rc">
-            <Form>LogServerFMX.Styles.res</Form>
-        </RcCompile>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -9,7 +9,9 @@ uses
   Vcl.Styles,
   uConstants in '..\LogServerShared\uConstants.pas',
   uLogStats in '..\LogServerShared\uLogStats.pas',
-  uLogCommon in '..\LogServerShared\uLogCommon.pas';
+  uLogCommon in '..\LogServerShared\uLogCommon.pas',
+  uLogStore in '..\LogServerShared\uLogStore.pas',
+  uMcpServer in '..\LogServerShared\uMcpServer.pas';
 
 {$R *.res}
 

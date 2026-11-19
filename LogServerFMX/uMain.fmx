@@ -135,7 +135,7 @@ object frmMain: TfrmMain
         TabOrder = 0
         object lblFilter: TLabel
           Align = Client
-          Size.Width = 472.000000000000000000
+          Size.Width = 362.000000000000000000
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           Text = 'Filter:'
@@ -144,12 +144,24 @@ object frmMain: TfrmMain
         object chkAutoScroll: TCheckBox
           Align = Right
           IsChecked = True
-          Position.X = 472.000000000000000000
+          Position.X = 362.000000000000000000
           Size.Width = 110.000000000000000000
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
           Text = 'Auto Scroll'
+        end
+        object chkMcpServer: TCheckBox
+          Align = Right
+          Position.X = 472.000000000000000000
+          Size.Width = 110.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 2
+          Text = 'MCP Server'
+          Hint = 'Gives AI tools (Claude, Codex, ...) access to the logs'
+          ShowHint = True
+          OnChange = chkMcpServerChange
         end
       end
       object layFilterEdit: TLayout

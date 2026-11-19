@@ -95,15 +95,29 @@ object frmMain: TfrmMain
       ExplicitLeft = 697
     end
     object chkAutoScroll: TCheckBox
-      Left = 800
+      Left = 703
       Top = 4
-      Width = 97
+      Width = 91
       Height = 17
       Anchors = [akTop, akRight]
       Caption = 'Auto Scroll'
       Checked = True
       State = cbChecked
       TabOrder = 0
+      ExplicitLeft = 526
+    end
+    object chkMcpServer: TCheckBox
+      Left = 800
+      Top = 4
+      Width = 97
+      Height = 17
+      Hint = 'Gives AI tools (Claude, Codex, ...) access to the logs'
+      Anchors = [akTop, akRight]
+      Caption = 'MCP Server'
+      ParentShowHint = False
+      ShowHint = True
+      TabOrder = 5
+      OnClick = chkMcpServerClick
       ExplicitLeft = 623
     end
     object cbPriority: TComboBox

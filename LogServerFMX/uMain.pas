@@ -30,6 +30,8 @@ uses
   IdException,
   uLogStats,
   uLogCommon,
+  uLogStore,
+  uMcpServer,
   uLogView,
   DNLog.Types,
   DNLog.Server;
@@ -50,6 +52,7 @@ type
     layFilterHeader: TLayout;
     lblFilter: TLabel;
     chkAutoScroll: TCheckBox;
+    chkMcpServer: TCheckBox;
     layFilterEdit: TLayout;
     edtFilter: TEdit;
     btnFiltersClear: TSpeedButton;
@@ -89,6 +92,7 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure tmrThroughputTimer(Sender: TObject);
+    procedure chkMcpServerChange(Sender: TObject);
     procedure tmrFilterTimer(Sender: TObject);
     procedure cbPriorityChange(Sender: TObject);
     procedure edtFilterChange(Sender: TObject);
@@ -106,7 +110,12 @@ type
     FLogUpdateThread: TLogUpdateThread;
     FSelectionTimer: TTimer;
     FStats: TLogStats;
+    FLogStore: TLogStore;
+    FMcpServer: TLogMcpServer;
+    FMcpSelectionTimer: TTimer;
+    lblMcp: TLabel;
     procedure CreateLogView;
+    procedure McpSelectionTimerTimer(Sender: TObject);
     procedure UpdateStatsDisplay;
     procedure SelectionTimerTimer(Sender: TObject);
     procedure vListSelectionChange(Sender: TObject);
@@ -149,6 +158,19 @@ begin
   FSelectionTimer.OnTimer := SelectionTimerTimer;
 
   FStats := TLogStats.Create;
+  FLogStore := TLogStore.Create;
+
+  // Selection is passed to the MCP server with a small delay
+  FMcpSelectionTimer := TTimer.Create(Self);
+  FMcpSelectionTimer.Enabled := False;
+  FMcpSelectionTimer.Interval := 200;
+  FMcpSelectionTimer.OnTimer := McpSelectionTimerTimer;
+
+  lblMcp := TLabel.Create(Self);
+  lblMcp.Align := TAlignLayout.Client;
+  lblMcp.TextSettings.HorzAlign := TTextAlign.Leading;
+  lblMcp.Parent := sbMain;
+  lblMcp.Text := 'MCP: off';
 
   for var lbl in TArray<TLabel>.Create(lblStatsTitle, lblStatsClientsHdr, lblStatsTypesHdr) do
   begin
@@ -200,12 +222,15 @@ end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
+  // First - its threads read FLogStore
+  FreeAndNil(FMcpServer);
   if Assigned(FServer) then
     FreeAndNil(FServer);
   FLogUpdateThread.Terminate;
   FLogUpdateThread.WaitFor;
   FreeAndNil(FLogUpdateThread);
   FreeAndNil(FStats);
+  FreeAndNil(FLogStore);
 end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
@@ -231,6 +256,49 @@ begin
           end);
         end);
     end;
+  end;
+end;
+
+// Off by default - started/stopped only by the user. FLogStore is filled all
+// the time, so after turning MCP on all logs received so far are available.
+procedure TfrmMain.chkMcpServerChange(Sender: TObject);
+begin
+  if chkMcpServer.IsChecked then
+  begin
+    if Assigned(FMcpServer) then
+      Exit;
+    FMcpServer := TLogMcpServer.Create(FLogStore, McpServerPort);
+    var Started := FMcpServer.Start;
+    lblMcp.Text := FMcpServer.StatusText;
+    if not Started then
+    begin
+      FreeAndNil(FMcpServer);
+      chkMcpServer.IsChecked := False; // calls this handler again - keeps the error text
+    end;
+  end else
+  if Assigned(FMcpServer) then
+  begin
+    FreeAndNil(FMcpServer);
+    lblMcp.Text := 'MCP: off';
+  end;
+end;
+
+procedure TfrmMain.McpSelectionTimerTimer(Sender: TObject);
+var
+  Ids: TList<Int64>;
+begin
+  FMcpSelectionTimer.Enabled := False;
+  Ids := TList<Int64>.Create;
+  try
+    Ids.Capacity := vList.SelectedCount;
+    vList.ForEachSelected(
+      procedure(const Node: TLogNode)
+      begin
+        Ids.Add(Node.LogId);
+      end);
+    FLogStore.SetSelection(Ids.ToArray);
+  finally
+    Ids.Free;
   end;
 end;
 
@@ -270,6 +338,10 @@ procedure TfrmMain.tmrFilterTimer(Sender: TObject);
 begin
   tmrFilter.Enabled := False;
   var Filter := BuildFilter;
+  if cbPriority.ItemIndex >= 0 then
+    FLogStore.SetUIFilter(cbPriority.Items[cbPriority.ItemIndex], cbClient.Text, cbTypeNr.Text, edtFilter.Text)
+  else
+    FLogStore.SetUIFilter('', cbClient.Text, cbTypeNr.Text, edtFilter.Text);
   vList.ApplyFilter(
     function(const Node: TLogNode): Boolean
     begin
@@ -321,11 +393,17 @@ var
   Filter: TLogFilter;
   ClientSet, TypeNrSet: TDictionary<string, Boolean>;
   WasAtBottom: Boolean;
+  Batch: TArray<TLogNode>;
+  BatchCount: Integer;
 begin
   if Length(Logs) = 0 then
     Exit;
 
   Filter := BuildFilter;
+
+  // Copies for the MCP server (strings are shared, not duplicated)
+  SetLength(Batch, Length(Logs));
+  BatchCount := 0;
 
   // Sets of existing clients/types for O(1) lookup
   ClientSet := TDictionary<string, Boolean>.Create;
@@ -349,6 +427,8 @@ begin
         FillLogNode(Node, Logs[Idx]);
         FStats.AddLog(Node.LogPriority, Node.LogClient, Node.LogTypeNr);
         vList.AddNode(Node, Filter.Matches(Node));
+        Batch[BatchCount] := Node;
+        Inc(BatchCount);
 
         if not ClientSet.ContainsKey(Node.LogClient) then
         begin
@@ -362,6 +442,8 @@ begin
           cbTypeNr.Items.Add(Node.LogTypeNrString);
         end;
       end;
+
+      FLogStore.AddNodes(Batch, BatchCount);
 
       // Auto-scroll only if checkbox is checked AND user was at bottom
       if chkAutoScroll.IsChecked and WasAtBottom then
@@ -385,6 +467,9 @@ var
   SelNode: TLogNode;
   Found: Boolean;
 begin
+  if not FMcpSelectionTimer.Enabled then
+    FMcpSelectionTimer.Enabled := True;
+
   if vList.SelectedCount > 1 then
   begin
     // Multiple selection - update count immediately, defer time calculation
@@ -474,6 +559,7 @@ procedure TfrmMain.actLogClearExecute(Sender: TObject);
 begin
   FLogUpdateThread.Logs.Clear;
   vList.Clear;
+  FLogStore.Clear;
   cbClient.Items.Clear;
   cbTypeNr.Items.Clear;
   edtMessage.Text := '';

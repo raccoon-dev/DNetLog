@@ -10,6 +10,8 @@ uses
   uConstants in '..\LogServerShared\uConstants.pas',
   uLogStats in '..\LogServerShared\uLogStats.pas',
   uLogCommon in '..\LogServerShared\uLogCommon.pas',
+  uLogStore in '..\LogServerShared\uLogStore.pas',
+  uMcpServer in '..\LogServerShared\uMcpServer.pas',
   DNLog.Server in '..\DNetLog\DNLog.Server.pas',
   DNLog.Types in '..\DNetLog\DNLog.Types.pas';
 

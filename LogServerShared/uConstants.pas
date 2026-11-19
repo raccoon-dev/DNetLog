@@ -27,6 +27,7 @@ const
 
   SBAR_SEL_COUNT = 0;
   SBAR_SEL_TIME  = 1;
+  SBAR_MCP       = 2;
 
   SAVE_FILE_PREFIX = 'DNetLog_';
   SAVE_FILE_DATE   = 'yyyymmdd_hhnnss';
@@ -34,6 +35,12 @@ const
 
   REFRESH_LIST_LOGS_COUNT = 50000;
   MAX_LOG_QUEUE_SIZE = 500000;
+
+  // MCP server (AI tools access to the logs) - http://127.0.0.1:9991/mcp
+  MCP_SERVER_PORT = 9991;
+  // Max logs returned by one get_logs / get_selected_logs call. Bigger results may exceed
+  // the AI client's output limit (~1000 logs is ~100 KB of text).
+  MCP_MAX_LIMIT   = 500;
 
 implementation
 

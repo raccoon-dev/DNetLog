@@ -123,6 +123,44 @@ TCP client is set by default. You can change it to UDP by uncomment define USE\_
 
 ---
 
+## AI tools access (MCP server)
+
+LogServerWin and LogServerFMX include an [MCP](https://modelcontextprotocol.io) server, so AI tools like Claude Code, Codex, Cursor etc. can read the logs shown in the window.
+
+- Address: `http://127.0.0.1:9991/mcp` (Streamable HTTP transport, localhost only). The status bar shows the address or the reason why the server didn't start.
+- The server is off by default - turn it on with the **MCP Server** checkbox (top right). Logs received before that are available too.
+- Command line: `-mcpport <n>` changes the port.
+- Tools (all read-only):
+  - `get_log_summary` - number of logs per priority, client and TypeNr, current window filter, number of selected rows.
+  - `get_logs` - logs filtered like in the window (priority, client, type\_nr, text) plus `min_priority`, `use_ui_filter`, paging (`before_id`) and polling for new logs (`since_id`).
+  - `get_log` - full details of logs by id.
+  - `get_log_context` - logs received just before and after a given log.
+  - `get_selected_logs` - rows selected in the window ("look at the selected logs"), paged with `since_id`.
+
+Configuration:
+
+Claude Code:
+```
+claude mcp add --transport http dnetlog http://127.0.0.1:9991/mcp
+```
+
+Codex (`~/.codex/config.toml`):
+```
+[mcp_servers.dnetlog]
+url = "http://127.0.0.1:9991/mcp"
+```
+
+Other tools (e.g. `.mcp.json`, Cursor `mcp.json`):
+```
+{
+  "mcpServers": {
+    "dnetlog": { "type": "http", "url": "http://127.0.0.1:9991/mcp" }
+  }
+}
+```
+
+---
+
 ### All ideas on how to improve this tool are welcome.
 
 ---
