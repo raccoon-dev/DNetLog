@@ -37,51 +37,11 @@ uses
   VirtualTrees.AncestorVCL,
   IdException,
   uLogStats,
+  uLogCommon,
   DNLog.Types,
   DNLog.Server;
 
 type
-  PLogNode = ^TLogNode;
-  TLogNode = record
-    LogId: Int64;
-    LogReceivedAt: TDateTime;
-    LogReceivedAtString: string;
-    LogPriority: TDNLogPriority;
-    LogTimestamp: Cardinal;
-    LogTimestampString: string;
-    LogClient: string;
-    LogTypeNr: Integer;
-    LogTypeNrString: string;
-    LogMessage: string;
-    LogMessageLC: string;
-    LogDataRaw: TBytes;
-    LogData: string;
-  end;
-
-  TCLientLogMessage = record
-    ClientIP: string;
-    DNLogMessage: TDNLogMessage;
-    constructor Create(const ClientIP: string; const DNLogMessage: TDNLogMessage);
-  end;
-
-  TOnProcessLogs = procedure(const Logs: TArray<TCLientLogMessage>) of object;
-
-  TLogUpdateThread = class(TThread)
-  private
-    FLogs: TThreadList<TCLientLogMessage>;
-    FOnProcessLogs: TOnProcessLogs;
-    FDroppedCount: Int64;
-    function Min(Value1, Value2: Integer): Integer; inline;
-  public
-    constructor Create(CreateSuspended: Boolean);
-    destructor Destroy; override;
-    procedure Execute; override;
-    procedure AddLog(const ClientIP: string; const LogMessage: TDNLogMessage);
-    property Logs: TThreadList<TCLientLogMessage> read FLogs;
-    property DroppedCount: Int64 read FDroppedCount;
-    property OnProcessLogs: TOnProcessLogs read FOnProcessLogs write FOnProcessLogs;
-  end;
-
   TfrmMain = class(TForm)
     pnlFilters: TPanel;
     vList: TVirtualStringTree;
@@ -168,13 +128,10 @@ type
     procedure SelectionTimerTimer(Sender: TObject);
     function  FillNode(const Node: PVirtualNode; const LogMessage: TCLientLogMessage): PLogNode;
     procedure OnLogReceived(Sender: TObject; const ClientIP: string; const LogMessage: TDNLogMessage);
-    procedure LogRowToString(AData: PLogNode; StringBuilder: TStringBuilder; const ASeparator: String; const AAddNewLine: Boolean; const AGetHeader: Boolean = False);
     procedure ExportCSV(StringBuilder: TStringBuilder);
     procedure FilterLog(Priority, Client, TypeNr, Filter: string);
-    function  OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr, Filter: string): Boolean;
-    function  ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
+    procedure ApplyNodeFilter(Node: PVirtualNode; const Filter: TLogFilter);
     procedure SetNodeVisible(Node: PVirtualNode; SetVisible: Boolean);
-    function  BytesToStr(Bytes: TBytes): string;
     function  GetLogBitmap: TBitmap;
     function  BitmapToPng(ABitmap: TBitmap): TPNGImage;
     procedure OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
@@ -227,7 +184,7 @@ begin
     begin
       Data := vList.GetNodeData(Node);
       if Assigned(Data) then
-        LogRowToString(Data, sb, '    ', true);
+        AppendLogRow(sb, Data^, '    ');
     end;
 
     Clipboard.AsText := sb.ToString;
@@ -371,25 +328,6 @@ begin
   StartFilter;
 end;
 
-function TfrmMain.BytesToStr(Bytes: TBytes): string;
-var
-  sb: TStringBuilder;
-  i: Integer;
-begin
-  sb := TStringBuilder.Create;
-  try
-    for i := Low(Bytes) to High(Bytes) do
-    begin
-      sb.Append(IntToHex(Bytes[i] ,2));
-      if i < High(Bytes) then
-        sb.Append(' ');
-    end;
-    Result := sb.ToString;
-  finally
-    sb.Free;
-  end;
-end;
-
 procedure TfrmMain.cbPriorityCloseUp(Sender: TObject);
 begin
   StartFilter;
@@ -406,7 +344,7 @@ var
   Data: PLogNode;
   enm: TVTVirtualNodeEnumeration;
 begin
-  LogRowToString(nil, StringBuilder, #9, true, true);
+  AppendLogHeader(StringBuilder, #9);
 
   if vList.SelectedCount > 1 then
     enm := vList.SelectedNodes
@@ -417,7 +355,7 @@ begin
   begin
     Data := vList.GetNodeData(Node);
     if Assigned(Data) then
-      LogRowToString(Data, StringBuilder, #9, true);
+      AppendLogRow(StringBuilder, Data^, #9);
   end;
 end;
 
@@ -428,29 +366,19 @@ begin
   if not Assigned(Result) then
     Exit;
 
-  Result.LogId              := LogMessage.DNLogMessage.LogId;
-  Result.LogReceivedAt      := LogMessage.DNLogMessage.LogReceivedAt;
-  Result.LogReceivedAtString := FormatDateTime(RECEIVED_AT_FORMAT, Result.LogReceivedAt);
-  Result.LogPriority        := LogMessage.DNLogMessage.LogPriority;
-  Result.LogTimestamp       := LogMessage.DNLogMessage.LogTimestamp;
-  Result.LogTimestampString := Format('%d.%.3d', [Result.LogTimestamp div 1000, Result.LogTimestamp mod 1000]);
-  Result.LogClient          := LogMessage.ClientIP;
-  Result.LogTypeNr          := LogMessage.DNLogMessage.LogTypeNr;
-  Result.LogTypeNrString    := IntToStr(Result.LogTypeNr);
-  Result.LogMessage         := LogMessage.DNLogMessage.LogMessage;
-  Result.LogMessageLC       := Result.LogMessage.ToLower;
-  Result.LogDataRaw         := Copy(LogMessage.DNLogMessage.LogData);
-  Result.LogData            := BytesToStr(Result.LogDataRaw);
+  FillLogNode(Result^, LogMessage);
 end;
 
 procedure TfrmMain.FilterLog(Priority, Client, TypeNr, Filter: string);
 var
   Node: PVirtualNode;
+  LogFilter: TLogFilter;
 begin
+  LogFilter := TLogFilter.Create(Priority, Client, TypeNr, Filter);
   vList.BeginUpdate;
   try
-  for Node in vList.Nodes do
-    OnFilterLog(Node, Priority, Client, TypeNr, Filter);
+    for Node in vList.Nodes do
+      ApplyNodeFilter(Node, LogFilter);
   finally
     vList.EndUpdate;
   end;
@@ -545,44 +473,6 @@ begin
   ReleaseDC(vList.Handle, DC);
 end;
 
-procedure TfrmMain.LogRowToString(AData: PLogNode;
-  StringBuilder: TStringBuilder; const ASeparator: String; const AAddNewLine,
-  AGetHeader: Boolean);
-begin
-  if AGetHeader then
-  begin
-    StringBuilder.Append('Id').Append(ASeparator)
-                 .Append('Received').Append(ASeparator)
-                 .Append('Priority').Append(ASeparator)
-                 .Append('Timestamp').Append(ASeparator)
-                 .Append('Client').Append(ASeparator)
-                 .Append('TypeNr').Append(ASeparator)
-                 .Append('Message').Append(ASeparator)
-                 .Append('Data');
-  end else
-  begin
-    StringBuilder.Append(AData.LogId).Append(ASeparator)
-                 .Append(AData.LogReceivedAtString).Append(ASeparator);
-    case AData.LogPriority of
-      prDebug    : StringBuilder.Append('Debug').Append(ASeparator);
-      prInfo     : StringBuilder.Append('Info').Append(ASeparator);
-      prWarning  : StringBuilder.Append('Warning').Append(ASeparator);
-      prError    : StringBuilder.Append('Error').Append(ASeparator);
-      prException: StringBuilder.Append('Exception').Append(ASeparator);
-    else
-      StringBuilder.Append(string.Empty).Append(ASeparator);
-    end;
-    StringBuilder.Append(AData.LogTimestampString).Append(ASeparator)
-                 .Append(AData.LogClient).Append(ASeparator)
-                 .Append(AData.LogTypeNrString).Append(ASeparator)
-                 .Append(AData.LogMessage).Append(ASeparator)
-                 .Append(AData.LogData);
-  end;
-
-  if AAddNewLine then
-    StringBuilder.AppendLine;
-end;
-
 procedure TfrmMain.pmnuMainPopup(Sender: TObject);
 begin
   if vList.SelectedCount > 1 then
@@ -595,52 +485,6 @@ begin
     actMessageCopy.Visible := True;
     actLogCopy.Caption     := 'Copy Logs to Clipboard';
     actLogSave.Caption     := 'Save Logs to File';
-  end;
-end;
-
-function TfrmMain.ParseTypeNrFilter(const TypeNrFilter: string): TList<Integer>;
-var
-  Parts: TArray<string>;
-  RangeParts: TArray<string>;
-  Part: string;
-  Value, RangeStart, RangeEnd, j: Integer;
-  i: Integer;
-begin
-  Result := TList<Integer>.Create;
-  if TypeNrFilter.IsEmpty then
-    Exit;
-
-  // Split by space, comma, semicolon, or dot
-  Parts := TypeNrFilter.Split([' ', ',', ';', '.'], TStringSplitOptions.ExcludeEmpty);
-
-  for i := 0 to High(Parts) do
-  begin
-    Part := Parts[i].Trim;
-
-    // Check if it's a range (contains hyphen)
-    if Part.Contains('-') then
-    begin
-      RangeParts := Part.Split(['-']);
-      if (Length(RangeParts) = 2) and
-         TryStrToInt(RangeParts[0].Trim, RangeStart) and
-         TryStrToInt(RangeParts[1].Trim, RangeEnd) then
-      begin
-        // Add all values in range (inclusive)
-        if RangeStart <= RangeEnd then
-          for j := RangeStart to RangeEnd do
-            Result.Add(j)
-        else
-          // Handle reverse range (e.g., 5-1)
-          for j := RangeStart downto RangeEnd do
-            Result.Add(j);
-      end;
-    end
-    else
-    begin
-      // Single value
-      if TryStrToInt(Part, Value) then
-        Result.Add(Value);
-    end;
   end;
 end;
 
@@ -724,7 +568,7 @@ begin
         max := d.LogTimestamp;
     end;
   end;
-  sbMain.Panels[SBAR_SEL_TIME].Text := Format('∆ time = %d.%.3d [s]', [(max - min) div 1000, (max - min) mod 1000]);
+  sbMain.Panels[SBAR_SEL_TIME].Text := FormatDeltaTime(min, max);
 end;
 
 procedure TfrmMain.vListFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
@@ -801,73 +645,13 @@ begin
   end;
 end;
 
-function TfrmMain.OnFilterLog(Node: PVirtualNode; Priority, Client, TypeNr,
-  Filter: string): Boolean;
+procedure TfrmMain.ApplyNodeFilter(Node: PVirtualNode; const Filter: TLogFilter);
 var
   Data: PLogNode;
-  bVisible: Boolean;
-  TypeNrValues: TList<Integer>;
 begin
-  Priority := Priority.ToLower;
-
-  Result := False;
-  if ((Priority = '') or Priority.Equals('all')) and Client.IsEmpty and TypeNr.IsEmpty and Filter.IsEmpty then
-    SetNodeVisible(Node, True) else
-  begin
-    Data := vList.GetNodeData(Node);
-
-    if not Priority.Equals('all') then
-    begin
-      case Data.LogPriority of
-        TDNLogPriority.prDebug    : bVisible := Priority.Equals('debug');
-        TDNLogPriority.prInfo     : bVisible := Priority.Equals('info');
-        TDNLogPriority.prWarning  : bVisible := Priority.Equals('warning');
-        TDNLogPriority.prError    : bVisible := Priority.Equals('error');
-        TDNLogPriority.prException: bVisible := Priority.Equals('exception');
-      else
-        bVisible := True;
-      end;
-      if not bVisible then
-      begin
-        SetNodeVisible(Node, False);
-        Result := True;
-        Exit;
-      end;
-    end;
-
-    if not Client.IsEmpty then
-      if not Data.LogClient.StartsWith(Client) then
-      begin
-        SetNodeVisible(Node, False);
-        Result := True;
-        Exit;
-      end;
-
-    if not TypeNr.IsEmpty then
-    begin
-      TypeNrValues := ParseTypeNrFilter(TypeNr);
-      try
-        if (TypeNrValues.Count > 0) and (TypeNrValues.IndexOf(Data.LogTypeNr) < 0) then
-        begin
-          SetNodeVisible(Node, False);
-          Result := True;
-          Exit;
-        end;
-      finally
-        TypeNrValues.Free;
-      end;
-    end;
-
-    if not Filter.IsEmpty then
-      if not Data.LogMessageLC.Contains(Filter.ToLower) and not Data.LogData.Contains(Filter) then
-      begin
-        SetNodeVisible(Node, False);
-        Result := True;
-        Exit;
-      end;
-
-    SetNodeVisible(Node, True);
-  end;
+  Data := vList.GetNodeData(Node);
+  if Assigned(Data) then
+    SetNodeVisible(Node, Filter.Matches(Data^));
 end;
 
 procedure TfrmMain.OnLogReceived(Sender: TObject; const ClientIP: string;
@@ -880,18 +664,15 @@ procedure TfrmMain.OnLogsProcess(const Logs: TArray<TCLientLogMessage>);
 var
   Node, Nod, LastNode, LastOldNode: PVirtualNode;
   Data: PLogNode;
-  PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter: string;
+  LogFilter: TLogFilter;
   ClientSet, TypeNrSet: TDictionary<string, Boolean>;
   WasAtBottom: Boolean;
 begin
   if Length(Logs) = 0 then
     Exit;
 
-  // Cache filter values
-  PriorityFilter := cbPriority.Text;
-  ClientFilter := cbClient.Text;
-  TypeNrFilter := cbTypeNr.Text;
-  MessageFilter := edtFilter.Text;
+  // Prepare filter once for the whole batch
+  LogFilter := TLogFilter.Create(cbPriority.Text, cbClient.Text, cbTypeNr.Text, edtFilter.Text);
 
   // Build sets of existing clients/types for O(1) lookup
   ClientSet := TDictionary<string, Boolean>.Create;
@@ -930,7 +711,7 @@ begin
         if Assigned(Data) then
         begin
           FStats.AddLog(Data.LogPriority, Data.LogClient, Data.LogTypeNr);
-          OnFilterLog(Node, PriorityFilter, ClientFilter, TypeNrFilter, MessageFilter);
+          SetNodeVisible(Node, LogFilter.Matches(Data^));
 
           if not ClientSet.ContainsKey(Data.LogClient) then
           begin
@@ -968,98 +749,6 @@ begin
     ClientSet.Free;
     TypeNrSet.Free;
   end;
-end;
-
-{ TLogUpdateThread }
-
-constructor TLogUpdateThread.Create(CreateSuspended: Boolean);
-begin
-  inherited Create(CreateSuspended);
-  FLogs := TThreadList<TCLientLogMessage>.Create;
-  FDroppedCount := 0;
-end;
-
-destructor TLogUpdateThread.Destroy;
-begin
-  FLogs.Free;
-  inherited;
-end;
-
-procedure TLogUpdateThread.Execute;
-begin
-  inherited;
-
-  while not Terminated do
-  begin
-    var Queue := FLogs.LockList;
-    if Queue.Count > 0 then
-    begin
-      if Assigned(FOnProcessLogs) then
-      begin
-        var LogsCount := Min(REFRESH_LIST_LOGS_COUNT, Queue.Count);
-        var Logs: TArray<TCLientLogMessage>;
-        SetLength(Logs, LogsCount);
-        for var i := 0 to LogsCount - 1 do
-          Logs[i] := Queue[i];
-        Queue.DeleteRange(0, LogsCount);
-        FLogs.UnlockList;
-
-        if not Terminated then
-          TThread.Synchronize(nil, procedure
-          begin
-            FOnProcessLogs(Logs);
-          end);
-
-        SetLength(Logs, 0);
-
-      end else
-      begin
-        Queue.Clear;
-        FLogs.UnlockList;
-      end;
-    end else
-    begin
-      FLogs.UnlockList;
-      Sleep(10);
-    end;
-  end;
-end;
-
-function TLogUpdateThread.Min(Value1, Value2: Integer): Integer;
-begin
-  if Value1 < Value2 then
-    Result := Value1
-  else
-    Result := Value2;
-end;
-
-procedure TLogUpdateThread.AddLog(const ClientIP: string; const LogMessage: TDNLogMessage);
-var
-  Queue: TList<TCLientLogMessage>;
-  DropCount: Integer;
-begin
-  Queue := FLogs.LockList;
-  try
-    // Drop oldest logs if queue is full
-    if Queue.Count >= MAX_LOG_QUEUE_SIZE then
-    begin
-      DropCount := Queue.Count - MAX_LOG_QUEUE_SIZE + 1;
-      Queue.DeleteRange(0, DropCount);
-      Inc(FDroppedCount, DropCount);
-    end;
-    Queue.Add(TCLientLogMessage.Create(ClientIP, LogMessage));
-  finally
-    FLogs.UnlockList;
-  end;
-end;
-
-{ TCLientLogMessage }
-
-constructor TCLientLogMessage.Create(const ClientIP: string;
-  const DNLogMessage: TDNLogMessage);
-begin
-  Self.ClientIP := ClientIP;
-  Self.DNLogMessage := DNLogMessage;
 end;
 
 end.

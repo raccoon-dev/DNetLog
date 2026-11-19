@@ -6,6 +6,9 @@
         <Projects Include="LogServerWin\LogServerWin.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="LogServerFMX\LogServerFMX.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="TestLogClient\TestLogClient.dproj">
             <Dependencies/>
         </Projects>
@@ -26,6 +29,15 @@
     <Target Name="LogServerWin:Make">
         <MSBuild Projects="LogServerWin\LogServerWin.dproj" Targets="Make"/>
     </Target>
+    <Target Name="LogServerFMX">
+        <MSBuild Projects="LogServerFMX\LogServerFMX.dproj"/>
+    </Target>
+    <Target Name="LogServerFMX:Clean">
+        <MSBuild Projects="LogServerFMX\LogServerFMX.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="LogServerFMX:Make">
+        <MSBuild Projects="LogServerFMX\LogServerFMX.dproj" Targets="Make"/>
+    </Target>
     <Target Name="TestLogClient">
         <MSBuild Projects="TestLogClient\TestLogClient.dproj"/>
     </Target>
@@ -36,13 +48,13 @@
         <MSBuild Projects="TestLogClient\TestLogClient.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="LogServerWin;TestLogClient"/>
+        <CallTarget Targets="LogServerWin;LogServerFMX;TestLogClient"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="LogServerWin:Clean;TestLogClient:Clean"/>
+        <CallTarget Targets="LogServerWin:Clean;LogServerFMX:Clean;TestLogClient:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="LogServerWin:Make;TestLogClient:Make"/>
+        <CallTarget Targets="LogServerWin:Make;LogServerFMX:Make;TestLogClient:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

@@ -143,8 +143,9 @@
         </DCCReference>
         <DCCReference Include="..\DNetLog\DNLog.Types.pas"/>
         <DCCReference Include="..\DNetLog\DNLog.Server.pas"/>
-        <DCCReference Include="uConstants.pas"/>
-        <DCCReference Include="uLogStats.pas"/>
+        <DCCReference Include="..\LogServerShared\uConstants.pas"/>
+        <DCCReference Include="..\LogServerShared\uLogStats.pas"/>
+        <DCCReference Include="..\LogServerShared\uLogCommon.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -69,3 +69,7 @@ __recovery/
 modules/
 *.json
 *.skincfg
+
+# Generated from LogServerFMX.Styles.rc at build time
+LogServerFMX/LogServerFMX.Styles.res
+*.vlb
