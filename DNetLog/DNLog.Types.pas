@@ -39,11 +39,15 @@ const
 type TDNLogPriority = (prDebug, prInfo, prWarning, prError, prException);
 
 type TDNLogMessage = record
+  // Fields transmitted over the network
   LogPriority: TDNLogPriority;
   LogTimestamp: Cardinal;
   LogTypeNr: ShortInt;
   LogMessage: string;
   LogData: TBytes;
+  // Server-side only - assigned by TDNLogServer on receipt, never sent over the network
+  LogId: Int64;             // Unique, strictly increasing within one server run (starts at 1)
+  LogReceivedAt: TDateTime; // Server local time when the message was received
 end;
 
 implementation

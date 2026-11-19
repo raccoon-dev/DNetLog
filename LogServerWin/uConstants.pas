@@ -30,6 +30,7 @@ const
 
   SAVE_FILE_PREFIX = 'DNetLog_';
   SAVE_FILE_DATE   = 'yyyymmdd_hhnnss';
+  RECEIVED_AT_FORMAT = 'yyyy-mm-dd hh:nn:ss.zzz';
 
   REFRESH_LIST_LOGS_COUNT = 50000;
   MAX_LOG_QUEUE_SIZE = 500000;

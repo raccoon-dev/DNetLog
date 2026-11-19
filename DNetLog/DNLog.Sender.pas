@@ -3,7 +3,8 @@ unit DNLog.Sender;
 interface
 
 uses
-  IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal, IdTCPClient;
+  IdBaseComponent, IdComponent, IdUDPBase, IdUDPClient, IdGlobal, IdTCPClient,
+  System.SyncObjs;
 
 type IDNLogSender = interface(IInterface)
   ['{AD968E05-E6A8-4A5C-A4DE-5C14199D4101}']
@@ -16,6 +17,9 @@ end;
 type TDNLogSenderTCP = class(TInterfacedObject, IDNLogSender)
   private
     FIdTCPClient: TIdTCPClient;
+    // Logs can be written from many threads at once - writes to a TCP stream
+    // must not interleave, otherwise the server gets corrupted packets.
+    FWriteLock: TCriticalSection;
   protected
     function GetConnected: Boolean;
     procedure SetConnected(Value: Boolean);
@@ -56,6 +60,7 @@ implementation
 
 constructor TDNLogSenderTCP.Create(Address: String; Port: Word);
 begin
+  FWriteLock        := TCriticalSection.Create;
   FIdTCPClient      := TIdTCPClient.Create;
   FIdTCPClient.Host := Address;
   FIdTCPClient.Port := Port;
@@ -66,6 +71,7 @@ destructor TDNLogSenderTCP.Destroy;
 begin
   Connected := False;
   FIdTCPClient.Free;
+  FWriteLock.Free;
   inherited;
 end;
 
@@ -90,14 +96,19 @@ end;
 
 procedure TDNLogSenderTCP.Write(IdBytes: TIdBytes);
 begin
+  FWriteLock.Enter;
   try
-    FIdTCPClient.Socket.Write(IdBytes, Length(IdBytes));
-  except
-    // Connection lost - disconnect so Connected returns false
     try
-      FIdTCPClient.Disconnect(False);
+      FIdTCPClient.Socket.Write(IdBytes, Length(IdBytes));
     except
+      // Connection lost - disconnect so Connected returns false
+      try
+        FIdTCPClient.Disconnect(False);
+      except
+      end;
     end;
+  finally
+    FWriteLock.Leave;
   end;
 end;
 

@@ -43,6 +43,9 @@ uses
 type
   PLogNode = ^TLogNode;
   TLogNode = record
+    LogId: Int64;
+    LogReceivedAt: TDateTime;
+    LogReceivedAtString: string;
     LogPriority: TDNLogPriority;
     LogTimestamp: Cardinal;
     LogTimestampString: string;
@@ -425,6 +428,9 @@ begin
   if not Assigned(Result) then
     Exit;
 
+  Result.LogId              := LogMessage.DNLogMessage.LogId;
+  Result.LogReceivedAt      := LogMessage.DNLogMessage.LogReceivedAt;
+  Result.LogReceivedAtString := FormatDateTime(RECEIVED_AT_FORMAT, Result.LogReceivedAt);
   Result.LogPriority        := LogMessage.DNLogMessage.LogPriority;
   Result.LogTimestamp       := LogMessage.DNLogMessage.LogTimestamp;
   Result.LogTimestampString := Format('%d.%.3d', [Result.LogTimestamp div 1000, Result.LogTimestamp mod 1000]);
@@ -433,8 +439,7 @@ begin
   Result.LogTypeNrString    := IntToStr(Result.LogTypeNr);
   Result.LogMessage         := LogMessage.DNLogMessage.LogMessage;
   Result.LogMessageLC       := Result.LogMessage.ToLower;
-  SetLength(Result.LogDataRaw, Length(LogMessage.DNLogMessage.LogData));
-  System.Move(LogMessage.DNLogMessage.LogData[0], Result.LogDataRaw[0], Length(LogMessage.DNLogMessage.LogData));
+  Result.LogDataRaw         := Copy(LogMessage.DNLogMessage.LogData);
   Result.LogData            := BytesToStr(Result.LogDataRaw);
 end;
 
@@ -505,6 +510,10 @@ end;
 
 procedure TfrmMain.FormShow(Sender: TObject);
 begin
+  // OnShow can fire more than once (e.g. after the window is re-created) -
+  // creating a second server would fail to bind the port and close the app.
+  if Assigned(FServer) then
+    Exit;
   try
     FServer := TDNLogServer.Create;
     FServer.OnLogReceived := OnLogReceived;
@@ -542,7 +551,9 @@ procedure TfrmMain.LogRowToString(AData: PLogNode;
 begin
   if AGetHeader then
   begin
-    StringBuilder.Append('Priority').Append(ASeparator)
+    StringBuilder.Append('Id').Append(ASeparator)
+                 .Append('Received').Append(ASeparator)
+                 .Append('Priority').Append(ASeparator)
                  .Append('Timestamp').Append(ASeparator)
                  .Append('Client').Append(ASeparator)
                  .Append('TypeNr').Append(ASeparator)
@@ -550,6 +561,8 @@ begin
                  .Append('Data');
   end else
   begin
+    StringBuilder.Append(AData.LogId).Append(ASeparator)
+                 .Append(AData.LogReceivedAtString).Append(ASeparator);
     case AData.LogPriority of
       prDebug    : StringBuilder.Append('Debug').Append(ASeparator);
       prInfo     : StringBuilder.Append('Info').Append(ASeparator);

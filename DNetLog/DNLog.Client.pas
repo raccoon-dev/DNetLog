@@ -273,7 +273,7 @@ begin
   sendBuffer[PACKET_OFFSET_TIMESTAMP + 1] := Byte(dt shr 16);
   sendBuffer[PACKET_OFFSET_TIMESTAMP + 2] := Byte(dt shr 8);
   sendBuffer[PACKET_OFFSET_TIMESTAMP + 3] := Byte(dt);
-  sendBuffer[PACKET_OFFSET_TYPENR] := LogTypeNr;
+  sendBuffer[PACKET_OFFSET_TYPENR] := Byte(LogTypeNr); // ShortInt -> raw byte (no range error for negative values)
   sendBuffer[PACKET_OFFSET_MSGLEN]     := Byte(Length(LogMessage) shr 8);
   sendBuffer[PACKET_OFFSET_MSGLEN + 1] := Byte(Length(LogMessage));
 

@@ -3,7 +3,7 @@ object frmMain: TfrmMain
   Top = 0
   Caption = 'DNetLog Server Win'
   ClientHeight = 525
-  ClientWidth = 729
+  ClientWidth = 906
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -46,12 +46,13 @@ object frmMain: TfrmMain
   object pnlFilters: TPanel
     Left = 0
     Top = 0
-    Width = 729
+    Width = 906
     Height = 57
     Align = alTop
     TabOrder = 0
+    ExplicitWidth = 729
     DesignSize = (
-      729
+      906
       57)
     object lblPriority: TLabel
       Left = 8
@@ -82,7 +83,7 @@ object frmMain: TfrmMain
       Caption = 'Filter:'
     end
     object btnFiltersClear: TSpeedButton
-      Left = 697
+      Left = 874
       Top = 23
       Width = 23
       Height = 22
@@ -91,9 +92,10 @@ object frmMain: TfrmMain
       ImageName = 'Clear Symbol_96px'
       Images = vilType
       OnClick = btnFiltersClearClick
+      ExplicitLeft = 697
     end
     object chkAutoScroll: TCheckBox
-      Left = 623
+      Left = 800
       Top = 4
       Width = 97
       Height = 17
@@ -102,6 +104,7 @@ object frmMain: TfrmMain
       Checked = True
       State = cbChecked
       TabOrder = 0
+      ExplicitLeft = 623
     end
     object cbPriority: TComboBox
       Left = 9
@@ -132,11 +135,12 @@ object frmMain: TfrmMain
     object edtFilter: TEdit
       Left = 279
       Top = 24
-      Width = 412
+      Width = 589
       Height = 21
       Anchors = [akLeft, akTop, akRight]
       TabOrder = 3
       OnChange = edtTypeNrChange
+      ExplicitWidth = 412
     end
     object cbTypeNr: TComboBox
       Left = 215
@@ -151,7 +155,7 @@ object frmMain: TfrmMain
   object vList: TVirtualStringTree
     Left = 0
     Top = 57
-    Width = 549
+    Width = 726
     Height = 388
     Align = alClient
     Colors.BorderColor = 5195575
@@ -199,7 +203,7 @@ object frmMain: TfrmMain
     OnGetHint = vListGetHint
     Touch.InteractiveGestures = [igPan, igPressAndTap]
     Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
-    ExplicitHeight = 391
+    ExplicitWidth = 549
     Columns = <
       item
         Alignment = taCenter
@@ -215,7 +219,7 @@ object frmMain: TfrmMain
         CaptionAlignment = taCenter
         MaxWidth = 150
         MinWidth = 100
-        Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
+        Options = [coAllowClick, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
         Position = 1
         Text = 'Timestamp'
         Width = 100
@@ -225,7 +229,7 @@ object frmMain: TfrmMain
         CaptionAlignment = taCenter
         MaxWidth = 200
         MinWidth = 120
-        Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
+        Options = [coAllowClick, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
         Position = 2
         Text = 'Client'
         Width = 120
@@ -235,7 +239,7 @@ object frmMain: TfrmMain
         CaptionAlignment = taCenter
         MaxWidth = 120
         MinWidth = 64
-        Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
+        Options = [coAllowClick, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coFixed, coAllowFocus, coUseCaptionAlignment, coStyleColor]
         Position = 3
         Text = 'Type Nr'
         Width = 64
@@ -253,19 +257,19 @@ object frmMain: TfrmMain
         MinWidth = 64
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAllowFocus, coUseCaptionAlignment, coStyleColor]
         Position = 5
-        Text = 'Data'
+        Text = 'Binary Data'
         Width = 200
       end>
   end
   object pnlStats: TPanel
-    Left = 549
+    Left = 726
     Top = 57
     Width = 180
     Height = 388
     Align = alRight
     BevelOuter = bvLowered
     TabOrder = 3
-    ExplicitHeight = 391
+    ExplicitLeft = 549
     object lblStatsTitle: TLabel
       Left = 8
       Top = 8
@@ -374,15 +378,16 @@ object frmMain: TfrmMain
   object pnlDetails: TPanel
     Left = 0
     Top = 445
-    Width = 729
+    Width = 906
     Height = 80
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 2
+    ExplicitWidth = 729
     object edtMessage: TEdit
       Left = 0
       Top = 0
-      Width = 729
+      Width = 906
       Height = 21
       Align = alTop
       BevelInner = bvNone
@@ -391,11 +396,12 @@ object frmMain: TfrmMain
       Color = clBtnFace
       ReadOnly = True
       TabOrder = 0
+      ExplicitWidth = 729
     end
     object edtData: TEdit
       Left = 0
       Top = 21
-      Width = 729
+      Width = 906
       Height = 21
       Align = alTop
       BevelInner = bvNone
@@ -404,11 +410,12 @@ object frmMain: TfrmMain
       Color = clBtnFace
       ReadOnly = True
       TabOrder = 1
+      ExplicitWidth = 729
     end
     object sbMain: TStatusBar
       Left = 0
       Top = 61
-      Width = 729
+      Width = 906
       Height = 19
       Panels = <
         item
@@ -417,7 +424,7 @@ object frmMain: TfrmMain
         item
           Width = 200
         end>
-      ExplicitTop = 58
+      ExplicitWidth = 729
     end
   end
   object pmnuMain: TPopupMenu
