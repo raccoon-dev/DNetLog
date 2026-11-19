@@ -1,7 +1,11 @@
 # DNetLog
 TCP/UDP logs for Delphi to help debug mobile applications.
 
-![Server screenshot](/Img/server_screenshot.png?raw=true "Server screenshot")
+VCL:
+![Server screenshot](/Img/server_screenshot1.png?raw=true "Server VCL screenshot")
+
+FMX:
+![Server screenshot](/Img/server_screenshot2.png?raw=true "Server FMX screenshot")
 
 ## Compiled log server
 Compiled log server:
